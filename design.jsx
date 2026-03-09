@@ -54,77 +54,79 @@ const HardPulseSymbol = () => {
         </defs>
 
         {/* === STAGE 1: LIMPED / DROOPING TO THE RIGHT === */}
-        <g transform="translate(110, 115) rotate(18)">
-          {/* Drive casing - skewed/droopy */}
-          <rect x="-65" y="-50" width="130" height="100" rx="5"
+        <g transform="translate(110, 120) rotate(28)">
+          {/* Drive casing - heavily warped/bent */}
+          <path d="M -65 -50 Q -50 -60 0 -55 Q 50 -50 65 -45 Q 72 -10 68 30 Q 55 55 0 52 Q -50 50 -65 45 Q -72 10 -65 -50 Z"
             fill="#1a1a1a" stroke="#444" strokeWidth="2" />
           {/* Corner screws */}
-          <circle cx="-55" cy="-40" r="3" fill="none" stroke="#333" strokeWidth="1" />
-          <circle cx="55" cy="-40" r="3" fill="none" stroke="#333" strokeWidth="1" />
-          <circle cx="-55" cy="40" r="3" fill="none" stroke="#333" strokeWidth="1" />
-          <circle cx="55" cy="40" r="3" fill="none" stroke="#333" strokeWidth="1" />
-          {/* Platter */}
-          <ellipse cx="-5" cy="2" rx="35" ry="35" fill="#2a2a2a" stroke="#444" strokeWidth="1.5" />
-          {/* Platter rings */}
-          <ellipse cx="-5" cy="2" rx="28" ry="28" fill="none" stroke="#383838" strokeWidth="0.5" />
-          <ellipse cx="-5" cy="2" rx="20" ry="20" fill="none" stroke="#383838" strokeWidth="0.5" />
-          <ellipse cx="-5" cy="2" rx="12" ry="12" fill="none" stroke="#383838" strokeWidth="0.5" />
+          <circle cx="-52" cy="-42" r="3" fill="none" stroke="#333" strokeWidth="1" />
+          <circle cx="52" cy="-38" r="3" fill="none" stroke="#333" strokeWidth="1" />
+          <circle cx="-52" cy="38" r="3" fill="none" stroke="#333" strokeWidth="1" />
+          <circle cx="52" cy="35" r="3" fill="none" stroke="#333" strokeWidth="1" />
+          {/* Platter - warped oval */}
+          <ellipse cx="-5" cy="2" rx="33" ry="36" fill="#2a2a2a" stroke="#444" strokeWidth="1.5" />
+          {/* Platter rings - wobbly */}
+          <path d="M -31 4 Q -20 -18 -5 -24 Q 10 -18 21 4 Q 10 26 -5 28 Q -20 26 -31 4 Z"
+            fill="none" stroke="#383838" strokeWidth="0.5" />
+          <path d="M -23 3 Q -14 -10 -5 -16 Q 4 -10 13 3 Q 4 18 -5 20 Q -14 18 -23 3 Z"
+            fill="none" stroke="#383838" strokeWidth="0.5" />
+          <ellipse cx="-5" cy="2" rx="10" ry="12" fill="none" stroke="#383838" strokeWidth="0.5" />
           {/* Spindle */}
           <circle cx="-5" cy="2" r="5" fill="#333" stroke="#444" strokeWidth="1" />
           <circle cx="-5" cy="2" r="2" fill="#444" />
-          {/* Actuator arm - droopy, sagging */}
-          <path d="M 40 -30 Q 30 -10 15 8 Q 5 18 -5 15"
+          {/* Actuator arm - heavily droopy, sagging curve */}
+          <path d="M 38 -28 Q 32 -5 20 12 Q 10 28 -8 30 Q -14 28 -12 20"
             fill="none" stroke="#555" strokeWidth="3" strokeLinecap="round" />
           {/* Arm pivot */}
-          <circle cx="40" cy="-30" r="6" fill="#2a2a2a" stroke="#444" strokeWidth="1.5" />
-          <circle cx="40" cy="-30" r="2.5" fill="#444" />
-          {/* Read head */}
-          <path d="M -5 15 l -6 3 l 3 2" fill="none" stroke="#555" strokeWidth="1.5" />
+          <circle cx="38" cy="-28" r="6" fill="#2a2a2a" stroke="#444" strokeWidth="1.5" />
+          <circle cx="38" cy="-28" r="2.5" fill="#444" />
+          {/* Read head - drooping */}
+          <path d="M -12 20 l -7 5 l 4 1" fill="none" stroke="#555" strokeWidth="1.5" />
           {/* Label */}
-          <text x="0" y="72" textAnchor="middle" fill="#444" fontSize="10" letterSpacing="3"
-            transform="rotate(-18)">01</text>
+          <text x="0" y="78" textAnchor="middle" fill="#444" fontSize="10" letterSpacing="3"
+            transform="rotate(-28)">01</text>
         </g>
 
         {/* === STAGE 2: PARTIALLY STRAIGHTENED === */}
-        <g transform="translate(330, 115) rotate(7)">
-          {/* Drive casing */}
-          <rect x="-65" y="-50" width="130" height="100" rx="5"
+        <g transform="translate(330, 115) rotate(12)">
+          {/* Drive casing - slightly warped */}
+          <path d="M -65 -50 Q -55 -54 0 -52 Q 55 -50 65 -48 Q 70 -10 67 35 Q 55 52 0 50 Q -55 50 -65 48 Q -70 10 -65 -50 Z"
             fill="#1a1a1a" stroke="#777" strokeWidth="2" />
           {/* Corner screws */}
-          <circle cx="-55" cy="-40" r="3" fill="none" stroke="#555" strokeWidth="1" />
-          <circle cx="55" cy="-40" r="3" fill="none" stroke="#555" strokeWidth="1" />
-          <circle cx="-55" cy="40" r="3" fill="none" stroke="#555" strokeWidth="1" />
-          <circle cx="55" cy="40" r="3" fill="none" stroke="#555" strokeWidth="1" />
+          <circle cx="-54" cy="-41" r="3" fill="none" stroke="#555" strokeWidth="1" />
+          <circle cx="54" cy="-39" r="3" fill="none" stroke="#555" strokeWidth="1" />
+          <circle cx="-54" cy="39" r="3" fill="none" stroke="#555" strokeWidth="1" />
+          <circle cx="54" cy="38" r="3" fill="none" stroke="#555" strokeWidth="1" />
           {/* Cross-head screws */}
-          <line x1="-55" y1="-42" x2="-55" y2="-38" stroke="#555" strokeWidth="0.7" />
-          <line x1="-57" y1="-40" x2="-53" y2="-40" stroke="#555" strokeWidth="0.7" />
-          <line x1="55" y1="-42" x2="55" y2="-38" stroke="#555" strokeWidth="0.7" />
-          <line x1="53" y1="-40" x2="57" y2="-40" stroke="#555" strokeWidth="0.7" />
-          {/* Platter */}
-          <ellipse cx="-5" cy="2" rx="35" ry="35" fill="#3a3a3a" stroke="#777" strokeWidth="1.5" />
-          {/* Platter rings */}
-          <ellipse cx="-5" cy="2" rx="28" ry="28" fill="none" stroke="#555" strokeWidth="0.5" />
-          <ellipse cx="-5" cy="2" rx="20" ry="20" fill="none" stroke="#555" strokeWidth="0.5" />
-          <ellipse cx="-5" cy="2" rx="12" ry="12" fill="none" stroke="#555" strokeWidth="0.5" />
+          <line x1="-54" y1="-43" x2="-54" y2="-39" stroke="#555" strokeWidth="0.7" />
+          <line x1="-56" y1="-41" x2="-52" y2="-41" stroke="#555" strokeWidth="0.7" />
+          <line x1="54" y1="-41" x2="54" y2="-37" stroke="#555" strokeWidth="0.7" />
+          <line x1="52" y1="-39" x2="56" y2="-39" stroke="#555" strokeWidth="0.7" />
+          {/* Platter - slightly oval */}
+          <ellipse cx="-5" cy="2" rx="34" ry="36" fill="#3a3a3a" stroke="#777" strokeWidth="1.5" />
+          {/* Platter rings - slightly wobbly */}
+          <ellipse cx="-5" cy="2" rx="27" ry="29" fill="none" stroke="#555" strokeWidth="0.5" />
+          <ellipse cx="-5" cy="2" rx="19" ry="21" fill="none" stroke="#555" strokeWidth="0.5" />
+          <ellipse cx="-5" cy="2" rx="11" ry="12" fill="none" stroke="#555" strokeWidth="0.5" />
           {/* Platter sheen */}
           <ellipse cx="-12" cy="-8" rx="14" ry="8" fill="none" stroke="#666" strokeWidth="0.3"
             transform="rotate(-30, -12, -8)" />
           {/* Spindle */}
           <circle cx="-5" cy="2" r="5" fill="#555" stroke="#777" strokeWidth="1" />
           <circle cx="-5" cy="2" r="2" fill="#666" />
-          {/* Actuator arm - slightly droopy */}
-          <path d="M 42 -28 Q 34 -14 18 2 Q 8 10 0 8"
+          {/* Actuator arm - noticeably curved/droopy */}
+          <path d="M 42 -28 Q 34 -8 20 8 Q 10 20 -2 16"
             fill="none" stroke="#888" strokeWidth="3" strokeLinecap="round" />
           {/* Arm pivot */}
           <circle cx="42" cy="-28" r="6" fill="#3a3a3a" stroke="#777" strokeWidth="1.5" />
           <circle cx="42" cy="-28" r="2.5" fill="#666" />
           {/* Read head */}
-          <path d="M 0 8 l -5 2 l 2 2" fill="none" stroke="#888" strokeWidth="1.5" />
+          <path d="M -2 16 l -6 3 l 3 2" fill="none" stroke="#888" strokeWidth="1.5" />
           {/* Ribbon cable hint */}
-          <path d="M -55 20 Q -60 25 -55 30" fill="none" stroke="#555" strokeWidth="1" />
+          <path d="M -55 20 Q -62 28 -55 34" fill="none" stroke="#555" strokeWidth="1" />
           {/* Label */}
-          <text x="0" y="70" textAnchor="middle" fill="#777" fontSize="10" letterSpacing="3"
-            transform="rotate(-7)">02</text>
+          <text x="0" y="74" textAnchor="middle" fill="#777" fontSize="10" letterSpacing="3"
+            transform="rotate(-12)">02</text>
         </g>
 
         {/* === STAGE 3: PERFECTLY STRAIGHT / RIGID === */}

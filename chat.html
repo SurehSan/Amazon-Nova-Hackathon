@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HardPulse</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0a;
+      color: #ccc;
+      font-family: 'Courier New', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ─────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 20px 0 10px;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    header .logo-text {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 8px;
+      text-transform: uppercase;
+    }
+    header .logo-text .hard { color: #fff; }
+    header .logo-text .pulse { color: #ff3c3c; text-shadow: 0 0 10px #ff3c3c; }
+    header .tagline {
+      font-size: 9px;
+      letter-spacing: 4px;
+      color: #444;
+      text-transform: uppercase;
+      margin-top: 4px;
+      text-align: center;
+    }
+
+    /* ── Chat area ──────────────────────────── */
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      max-width: 800px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .msg {
+      max-width: 85%;
+      padding: 12px 16px;
+      border-radius: 8px;
+      line-height: 1.5;
+      font-size: 14px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .msg.user {
+      align-self: flex-end;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #ddd;
+    }
+    .msg.assistant {
+      align-self: flex-start;
+      background: #12080a;
+      border: 1px solid #331111;
+      color: #ddd;
+    }
+    .msg.assistant .label,
+    .msg.user .label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      margin-bottom: 6px;
+      display: block;
+    }
+    .msg.user .label { color: #555; }
+    .msg.assistant .label { color: #ff3c3c; }
+
+    .msg.error {
+      align-self: center;
+      background: #1a0a0a;
+      border: 1px solid #ff3c3c44;
+      color: #ff6b6b;
+      font-size: 12px;
+    }
+
+    /* Typing indicator */
+    .typing {
+      align-self: flex-start;
+      display: flex;
+      gap: 6px;
+      padding: 14px 20px;
+    }
+    .typing span {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #ff3c3c;
+      animation: blink 1.2s infinite;
+    }
+    .typing span:nth-child(2) { animation-delay: 0.2s; }
+    .typing span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink {
+      0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+      40% { opacity: 1; transform: scale(1); }
+    }
+
+    /* ── Input bar ──────────────────────────── */
+    #input-bar {
+      display: flex;
+      gap: 10px;
+      padding: 16px 20px;
+      border-top: 1px solid #1a1a1a;
+      max-width: 800px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    #prompt {
+      flex: 1;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      color: #eee;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      padding: 12px 16px;
+      border-radius: 6px;
+      outline: none;
+      resize: none;
+      min-height: 44px;
+      max-height: 140px;
+    }
+    #prompt:focus { border-color: #ff3c3c55; }
+    #prompt::placeholder { color: #444; }
+
+    #send-btn {
+      background: #ff3c3c;
+      border: none;
+      color: #fff;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 0 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    #send-btn:hover { background: #ff5555; box-shadow: 0 0 14px #ff3c3c66; }
+    #send-btn:disabled { background: #333; cursor: default; box-shadow: none; }
+
+    /* ── Image upload button ─────────────────── */
+    #img-btn {
+      background: none;
+      border: 1px solid #2a2a2a;
+      color: #666;
+      font-size: 18px;
+      width: 44px;
+      height: 44px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    #img-btn:hover { border-color: #ff3c3c55; color: #ff3c3c; }
+
+    /* ── Image preview strip ─────────────────── */
+    #img-preview {
+      display: none;
+      gap: 8px;
+      padding: 8px 20px 0;
+      max-width: 800px;
+      width: 100%;
+      margin: 0 auto;
+      flex-wrap: wrap;
+    }
+    #img-preview.has-images { display: flex; }
+    .img-thumb {
+      position: relative;
+      width: 64px; height: 64px;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid #333;
+    }
+    .img-thumb img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+    .img-thumb .remove {
+      position: absolute;
+      top: 2px; right: 2px;
+      background: #0a0a0aCC;
+      color: #ff3c3c;
+      border: none;
+      border-radius: 50%;
+      width: 18px; height: 18px;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .msg img.chat-img {
+      max-width: 200px;
+      max-height: 200px;
+      border-radius: 6px;
+      margin-top: 8px;
+      display: block;
+      border: 1px solid #333;
+    }
+
+    /* ── Scrollbar ───────────────────────────── */
+    #chat::-webkit-scrollbar { width: 6px; }
+    #chat::-webkit-scrollbar-track { background: transparent; }
+    #chat::-webkit-scrollbar-thumb { background: #222; border-radius: 3px; }
+
+    /* ── Pulse dot in header ─────────────────── */
+    .pulse-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #ff3c3c;
+      box-shadow: 0 0 10px #ff3c3c;
+      animation: pdot 1.5s infinite;
+      display: inline-block;
+      margin-left: 8px;
+    }
+    @keyframes pdot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <div class="logo-text">
+        <span class="hard">HARD</span><span class="pulse">PULSE</span>
+        <span class="pulse-dot"></span>
+      </div>
+      <div class="tagline">The software that finds your hardware</div>
+    </div>
+  </header>
+
+  <div id="chat"></div>
+
+  <div id="img-preview"></div>
+  <div id="input-bar">
+    <button id="img-btn" title="Attach image">&#128247;</button>
+    <input type="file" id="img-input" accept="image/*" multiple hidden />
+    <textarea id="prompt" rows="1" placeholder="Ask HardPulse anything... (paste or attach images)" autofocus></textarea>
+    <button id="send-btn">Send</button>
+  </div>
+
+  <script>
+    const chat = document.getElementById("chat");
+    const promptEl = document.getElementById("prompt");
+    const sendBtn = document.getElementById("send-btn");
+    const imgBtn = document.getElementById("img-btn");
+    const imgInput = document.getElementById("img-input");
+    const imgPreview = document.getElementById("img-preview");
+
+    let messages = [];   // conversation history sent to API
+    let pendingImages = [];  // base64 data URLs of attached images
+
+    // ── Image handling ──────────────────────────
+    imgBtn.addEventListener("click", () => imgInput.click());
+
+    imgInput.addEventListener("change", (e) => {
+      for (const file of e.target.files) addImageFile(file);
+      imgInput.value = "";
+    });
+
+    // Paste images from clipboard
+    promptEl.addEventListener("paste", (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          e.preventDefault();
+          addImageFile(item.getAsFile());
+        }
+      }
+    });
+
+    // Drag and drop
+    document.body.addEventListener("dragover", (e) => e.preventDefault());
+    document.body.addEventListener("drop", (e) => {
+      e.preventDefault();
+      for (const file of e.dataTransfer.files) {
+        if (file.type.startsWith("image/")) addImageFile(file);
+      }
+    });
+
+    function addImageFile(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result;
+        pendingImages.push(dataUrl);
+        renderImagePreview();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function renderImagePreview() {
+      imgPreview.innerHTML = "";
+      imgPreview.className = pendingImages.length ? "has-images" : "";
+      pendingImages.forEach((src, i) => {
+        const thumb = document.createElement("div");
+        thumb.className = "img-thumb";
+        thumb.innerHTML = `<img src="${src}"><button class="remove" data-idx="${i}">&times;</button>`;
+        thumb.querySelector(".remove").addEventListener("click", () => {
+          pendingImages.splice(i, 1);
+          renderImagePreview();
+        });
+        imgPreview.appendChild(thumb);
+      });
+    }
+
+    function addMsg(role, text, images) {
+      const div = document.createElement("div");
+      div.className = "msg " + role;
+      const label = document.createElement("span");
+      label.className = "label";
+      label.textContent = role === "user" ? "You" : "HardPulse";
+      div.appendChild(label);
+      if (images && images.length) {
+        images.forEach(src => {
+          const img = document.createElement("img");
+          img.src = src;
+          img.className = "chat-img";
+          div.appendChild(img);
+        });
+      }
+      if (text) div.appendChild(document.createTextNode(text));
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+      return div;
+    }
+
+    function showTyping() {
+      const div = document.createElement("div");
+      div.className = "typing";
+      div.id = "typing-indicator";
+      div.innerHTML = "<span></span><span></span><span></span>";
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+    function hideTyping() {
+      const el = document.getElementById("typing-indicator");
+      if (el) el.remove();
+    }
+
+    async function send() {
+      const text = promptEl.value.trim();
+      const images = [...pendingImages];
+      if (!text && !images.length) return;
+
+      promptEl.value = "";
+      promptEl.style.height = "44px";
+      pendingImages = [];
+      renderImagePreview();
+      sendBtn.disabled = true;
+
+      addMsg("user", text, images);
+
+      // Build content array for vision API
+      const content = [];
+      images.forEach(dataUrl => {
+        content.push({ type: "image_url", image_url: { url: dataUrl } });
+      });
+      if (text) content.push({ type: "text", text: text });
+
+      messages.push({ role: "user", content: content.length === 1 && !images.length ? text : content });
+
+      showTyping();
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages }),
+        });
+        const data = await res.json();
+        hideTyping();
+
+        if (data.error) {
+          const errDiv = document.createElement("div");
+          errDiv.className = "msg error";
+          errDiv.textContent = "Error: " + data.error;
+          chat.appendChild(errDiv);
+        } else {
+          addMsg("assistant", data.reply);
+          messages.push({ role: "assistant", content: data.reply });
+        }
+      } catch (e) {
+        hideTyping();
+        const errDiv = document.createElement("div");
+        errDiv.className = "msg error";
+        errDiv.textContent = "Network error: " + e.message;
+        chat.appendChild(errDiv);
+      }
+
+      sendBtn.disabled = false;
+      promptEl.focus();
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    sendBtn.addEventListener("click", send);
+    promptEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+    });
+
+    // Auto-resize textarea
+    promptEl.addEventListener("input", () => {
+      promptEl.style.height = "44px";
+      promptEl.style.height = Math.min(promptEl.scrollHeight, 140) + "px";
+    });
+  </script>
+</body>
+</html>

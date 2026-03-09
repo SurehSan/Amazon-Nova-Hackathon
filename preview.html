@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HardPulse Preview</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0a; }
+  </style>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useEffect, useState } = React;
+
+    const HardPulseSymbol = () => {
+      const [animated, setAnimated] = useState(false);
+
+      useEffect(() => {
+        setTimeout(() => setAnimated(true), 300);
+      }, []);
+
+      return (
+        <div style={{
+          background: "#0a0a0a",
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "'Courier New', monospace",
+          gap: "48px"
+        }}>
+          <svg width="660" height="240" viewBox="0 0 660 240">
+            <defs>
+              <linearGradient id="pulseGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#333" />
+                <stop offset="100%" stopColor="#ff3c3c" />
+              </linearGradient>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+                <feMerge>
+                  <feMergeNode in="coloredBlur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+
+            {/* STAGE 1: LIMPED / DROOPING TO THE RIGHT */}
+            <g transform="translate(110, 115) rotate(18)">
+              <rect x="-65" y="-50" width="130" height="100" rx="5"
+                fill="#1a1a1a" stroke="#444" strokeWidth="2" />
+              <circle cx="-55" cy="-40" r="3" fill="none" stroke="#333" strokeWidth="1" />
+              <circle cx="55" cy="-40" r="3" fill="none" stroke="#333" strokeWidth="1" />
+              <circle cx="-55" cy="40" r="3" fill="none" stroke="#333" strokeWidth="1" />
+              <circle cx="55" cy="40" r="3" fill="none" stroke="#333" strokeWidth="1" />
+              <ellipse cx="-5" cy="2" rx="35" ry="35" fill="#2a2a2a" stroke="#444" strokeWidth="1.5" />
+              <ellipse cx="-5" cy="2" rx="28" ry="28" fill="none" stroke="#383838" strokeWidth="0.5" />
+              <ellipse cx="-5" cy="2" rx="20" ry="20" fill="none" stroke="#383838" strokeWidth="0.5" />
+              <ellipse cx="-5" cy="2" rx="12" ry="12" fill="none" stroke="#383838" strokeWidth="0.5" />
+              <circle cx="-5" cy="2" r="5" fill="#333" stroke="#444" strokeWidth="1" />
+              <circle cx="-5" cy="2" r="2" fill="#444" />
+              <path d="M 40 -30 Q 30 -10 15 8 Q 5 18 -5 15"
+                fill="none" stroke="#555" strokeWidth="3" strokeLinecap="round" />
+              <circle cx="40" cy="-30" r="6" fill="#2a2a2a" stroke="#444" strokeWidth="1.5" />
+              <circle cx="40" cy="-30" r="2.5" fill="#444" />
+              <path d="M -5 15 l -6 3 l 3 2" fill="none" stroke="#555" strokeWidth="1.5" />
+              <text x="0" y="72" textAnchor="middle" fill="#444" fontSize="10" letterSpacing="3"
+                transform="rotate(-18)">01</text>
+            </g>
+
+            {/* STAGE 2: PARTIALLY STRAIGHTENED */}
+            <g transform="translate(330, 115) rotate(7)">
+              <rect x="-65" y="-50" width="130" height="100" rx="5"
+                fill="#1a1a1a" stroke="#777" strokeWidth="2" />
+              <circle cx="-55" cy="-40" r="3" fill="none" stroke="#555" strokeWidth="1" />
+              <circle cx="55" cy="-40" r="3" fill="none" stroke="#555" strokeWidth="1" />
+              <circle cx="-55" cy="40" r="3" fill="none" stroke="#555" strokeWidth="1" />
+              <circle cx="55" cy="40" r="3" fill="none" stroke="#555" strokeWidth="1" />
+              <line x1="-55" y1="-42" x2="-55" y2="-38" stroke="#555" strokeWidth="0.7" />
+              <line x1="-57" y1="-40" x2="-53" y2="-40" stroke="#555" strokeWidth="0.7" />
+              <line x1="55" y1="-42" x2="55" y2="-38" stroke="#555" strokeWidth="0.7" />
+              <line x1="53" y1="-40" x2="57" y2="-40" stroke="#555" strokeWidth="0.7" />
+              <ellipse cx="-5" cy="2" rx="35" ry="35" fill="#3a3a3a" stroke="#777" strokeWidth="1.5" />
+              <ellipse cx="-5" cy="2" rx="28" ry="28" fill="none" stroke="#555" strokeWidth="0.5" />
+              <ellipse cx="-5" cy="2" rx="20" ry="20" fill="none" stroke="#555" strokeWidth="0.5" />
+              <ellipse cx="-5" cy="2" rx="12" ry="12" fill="none" stroke="#555" strokeWidth="0.5" />
+              <ellipse cx="-12" cy="-8" rx="14" ry="8" fill="none" stroke="#666" strokeWidth="0.3"
+                transform="rotate(-30, -12, -8)" />
+              <circle cx="-5" cy="2" r="5" fill="#555" stroke="#777" strokeWidth="1" />
+              <circle cx="-5" cy="2" r="2" fill="#666" />
+              <path d="M 42 -28 Q 34 -14 18 2 Q 8 10 0 8"
+                fill="none" stroke="#888" strokeWidth="3" strokeLinecap="round" />
+              <circle cx="42" cy="-28" r="6" fill="#3a3a3a" stroke="#777" strokeWidth="1.5" />
+              <circle cx="42" cy="-28" r="2.5" fill="#666" />
+              <path d="M 0 8 l -5 2 l 2 2" fill="none" stroke="#888" strokeWidth="1.5" />
+              <path d="M -55 20 Q -60 25 -55 30" fill="none" stroke="#555" strokeWidth="1" />
+              <text x="0" y="70" textAnchor="middle" fill="#777" fontSize="10" letterSpacing="3"
+                transform="rotate(-7)">02</text>
+            </g>
+
+            {/* STAGE 3: PERFECTLY STRAIGHT */}
+            <g transform="translate(550, 115)" filter="url(#glow)">
+              <rect x="-65" y="-50" width="130" height="100" rx="5"
+                fill="#1a1a1a" stroke="#ff3c3c" strokeWidth="2" />
+              <circle cx="-55" cy="-40" r="3" fill="none" stroke="#cc2222" strokeWidth="1" />
+              <circle cx="55" cy="-40" r="3" fill="none" stroke="#cc2222" strokeWidth="1" />
+              <circle cx="-55" cy="40" r="3" fill="none" stroke="#cc2222" strokeWidth="1" />
+              <circle cx="55" cy="40" r="3" fill="none" stroke="#cc2222" strokeWidth="1" />
+              <line x1="-55" y1="-42" x2="-55" y2="-38" stroke="#cc2222" strokeWidth="0.7" />
+              <line x1="-57" y1="-40" x2="-53" y2="-40" stroke="#cc2222" strokeWidth="0.7" />
+              <line x1="55" y1="-42" x2="55" y2="-38" stroke="#cc2222" strokeWidth="0.7" />
+              <line x1="53" y1="-40" x2="57" y2="-40" stroke="#cc2222" strokeWidth="0.7" />
+              <line x1="-55" y1="38" x2="-55" y2="42" stroke="#cc2222" strokeWidth="0.7" />
+              <line x1="-57" y1="40" x2="-53" y2="40" stroke="#cc2222" strokeWidth="0.7" />
+              <line x1="55" y1="38" x2="55" y2="42" stroke="#cc2222" strokeWidth="0.7" />
+              <line x1="53" y1="40" x2="57" y2="40" stroke="#cc2222" strokeWidth="0.7" />
+              <circle cx="-5" cy="2" r="35" fill="#2a2a2a" stroke="#ff3c3c" strokeWidth="1.5" />
+              <circle cx="-5" cy="2" r="28" fill="none" stroke="#882222" strokeWidth="0.5" />
+              <circle cx="-5" cy="2" r="20" fill="none" stroke="#882222" strokeWidth="0.5" />
+              <circle cx="-5" cy="2" r="12" fill="none" stroke="#882222" strokeWidth="0.5" />
+              <ellipse cx="-14" cy="-10" rx="16" ry="9" fill="none" stroke="#ff5555" strokeWidth="0.4"
+                transform="rotate(-30, -14, -10)" opacity="0.5" />
+              <circle cx="-5" cy="2" r="5" fill="#333" stroke="#ff3c3c" strokeWidth="1" />
+              <circle cx="-5" cy="2" r="2" fill="#ff3c3c" />
+              <line x1="44" y1="-26" x2="0" y2="2"
+                stroke="#ff3c3c" strokeWidth="3" strokeLinecap="round" />
+              <circle cx="44" cy="-26" r="7" fill="#2a2a2a" stroke="#ff3c3c" strokeWidth="1.5" />
+              <circle cx="44" cy="-26" r="3" fill="#ff3c3c" />
+              <path d="M 0 2 l -6 2 l 3 3" fill="none" stroke="#ff3c3c" strokeWidth="1.5" />
+              <path d="M -55 20 L -62 20 L -62 30 L -55 30" fill="none" stroke="#cc2222" strokeWidth="1" />
+              <line x1="-50" y1="48" x2="-40" y2="48" stroke="#cc2222" strokeWidth="1" />
+              <line x1="-35" y1="48" x2="-25" y2="48" stroke="#cc2222" strokeWidth="1" />
+              <line x1="-20" y1="48" x2="-10" y2="48" stroke="#cc2222" strokeWidth="1" />
+              <text x="0" y="72" textAnchor="middle" fill="#ff3c3c" fontSize="10" letterSpacing="3">03</text>
+            </g>
+
+            {/* Connecting pulse lines */}
+            <line x1="178" y1="115" x2="262" y2="115" stroke="url(#pulseGrad)" strokeWidth="1.5" strokeDasharray="6 4" />
+            <line x1="398" y1="115" x2="482" y2="115" stroke="#ff3c3c" strokeWidth="1.5" strokeDasharray="6 4"
+              style={{ filter: "drop-shadow(0 0 6px #ff3c3c)" }} />
+            <polygon points="262,112 262,118 270,115" fill="#888" />
+            <polygon points="482,112 482,118 490,115" fill="#ff3c3c"
+              style={{ filter: "drop-shadow(0 0 4px #ff3c3c)" }} />
+          </svg>
+
+          {/* Wordmark */}
+          <div style={{ textAlign: "center" }}>
+            <div style={{
+              fontSize: "32px",
+              letterSpacing: "12px",
+              color: "#fff",
+              fontWeight: "700",
+              textTransform: "uppercase",
+              display: "flex",
+              gap: "0px",
+              justifyContent: "center"
+            }}>
+              <span style={{ color: "#fff" }}>HARD</span>
+              <span style={{ color: "#ff3c3c", filter: "drop-shadow(0 0 8px #ff3c3c)" }}>PULSE</span>
+            </div>
+            <div style={{
+              fontSize: "10px",
+              letterSpacing: "6px",
+              color: "#555",
+              marginTop: "10px",
+              textTransform: "uppercase"
+            }}>
+              The software that finds your hardware
+            </div>
+          </div>
+
+          {/* Pulse indicator */}
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            {[0, 1, 2].map(i => (
+              <div key={i} style={{
+                width: i === 2 ? "8px" : "6px",
+                height: i === 2 ? "8px" : "6px",
+                borderRadius: "50%",
+                background: i === 2 ? "#ff3c3c" : "#333",
+                boxShadow: i === 2 ? "0 0 10px #ff3c3c" : "none",
+                animation: i === 2 ? "pulse 1.5s infinite" : "none"
+              }} />
+            ))}
+            <style>{`
+              @keyframes pulse {
+                0%, 100% { opacity: 1; transform: scale(1); }
+                50% { opacity: 0.4; transform: scale(0.7); }
+              }
+            `}</style>
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<HardPulseSymbol />);
+  </script>
+</body>
+</html>

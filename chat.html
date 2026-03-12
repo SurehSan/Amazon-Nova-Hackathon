@@ -7,6 +7,10 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
+    html, body {
+      height: 100%;
+    }
+
     body {
       background: #0a0a0a;
       color: #ccc;
@@ -69,7 +73,8 @@
 
     /* ── Chat area ──────────────────────────── */
     #chat {
-      flex: 1;
+      flex: 1 1 auto;
+      min-height: 0;
       overflow-y: auto;
       padding: 24px 20px;
       display: flex;
@@ -88,6 +93,7 @@
       font-size: 14px;
       white-space: pre-wrap;
       word-wrap: break-word;
+      overflow-wrap: anywhere;
     }
     .msg.user {
       align-self: flex-end;
@@ -111,6 +117,48 @@
     }
     .msg.user .label { color: #555; }
     .msg.assistant .label { color: #ff3c3c; }
+
+    .msg.assistant a {
+      color: #ff6a6a;
+      text-decoration: underline;
+    }
+    .msg.assistant a:hover {
+      color: #ff8a8a;
+    }
+
+    .ebay-results ol {
+      margin: 8px 0 0 18px;
+      padding: 0;
+    }
+    .ebay-results li {
+      margin-bottom: 10px;
+    }
+    .ebay-results .ebay-title {
+      font-weight: 700;
+    }
+    .ebay-results .ebay-meta,
+    .ebay-results .ebay-eff,
+    .ebay-results .ebay-summary {
+      font-size: 12px;
+      color: #b0b0b0;
+    }
+    .ebay-results .load-more {
+      margin-top: 8px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #eee;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .ebay-results .load-more:hover {
+      border-color: #ff3c3c55;
+      color: #ff6a6a;
+    }
 
     .msg.error {
       align-self: center;
@@ -696,7 +744,43 @@
       });
     }
 
-    function addMsg(role, text, images) {
+    function escapeHtml(value) {
+      return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function linkify(text) {
+      const urlRegex = /https?:\/\/[^\s]+/g;
+      let result = "";
+      let lastIndex = 0;
+      let match;
+
+      while ((match = urlRegex.exec(text)) !== null) {
+        const start = match.index;
+        const end = urlRegex.lastIndex;
+        result += escapeHtml(text.slice(lastIndex, start));
+
+        let url = match[0];
+        let trailing = "";
+        while (/[\]\[\)\.,!?:;]$/.test(url)) {
+          trailing = url.slice(-1) + trailing;
+          url = url.slice(0, -1);
+        }
+
+        const safeUrl = escapeHtml(url);
+        result += `<a href="${safeUrl}" target="_blank" rel="noopener">${safeUrl}</a>${escapeHtml(trailing)}`;
+        lastIndex = end;
+      }
+
+      result += escapeHtml(text.slice(lastIndex));
+      return result;
+    }
+
+    function addMsg(role, text, images, htmlContent) {
       const div = document.createElement("div");
       div.className = "msg " + role;
       const label = document.createElement("span");
@@ -711,10 +795,42 @@
           div.appendChild(img);
         });
       }
-      if (text) div.appendChild(document.createTextNode(text));
+      const body = document.createElement("div");
+      body.className = "msg-body";
+      if (htmlContent) {
+        body.innerHTML = htmlContent;
+      } else if (text) {
+        body.innerHTML = linkify(text);
+      }
+      div.appendChild(body);
       chat.appendChild(div);
       chat.scrollTop = chat.scrollHeight;
       return div;
+    }
+
+    async function handleLoadMore(button) {
+      const query = button.getAttribute("data-query") || "";
+      const offset = parseInt(button.getAttribute("data-offset") || "0", 10);
+
+      if (!query) return;
+      button.disabled = true;
+      button.textContent = "Loading...";
+
+      try {
+        const res = await fetch("/api/ebay", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query, offset, limit: 5 }),
+        });
+        const data = await res.json();
+        if (data.error) {
+          addMsg("assistant", "Error: " + data.error);
+          return;
+        }
+        addMsg("assistant", data.reply, null, data.reply_html);
+      } catch (e) {
+        addMsg("assistant", "Network error: " + e.message);
+      }
     }
 
     function showTyping() {
@@ -769,8 +885,9 @@
           errDiv.textContent = "Error: " + data.error;
           chat.appendChild(errDiv);
         } else {
-          addMsg("assistant", data.reply);
-          messages.push({ role: "assistant", content: data.reply });
+          addMsg("assistant", data.reply, null, data.reply_html);
+          const assistantText = data.reply || "eBay results returned.";
+          messages.push({ role: "assistant", content: assistantText });
         }
       } catch (e) {
         hideTyping();
@@ -786,6 +903,12 @@
     }
 
     sendBtn.addEventListener("click", send);
+    chat.addEventListener("click", (e) => {
+      const target = e.target;
+      if (target && target.classList.contains("load-more")) {
+        handleLoadMore(target);
+      }
+    });
     promptEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
     });

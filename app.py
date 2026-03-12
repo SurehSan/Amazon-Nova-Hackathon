@@ -2,6 +2,7 @@ import os
 import re
 import time
 import base64
+import html
 import requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -60,7 +61,7 @@ def _get_ebay_token():
 
 
 # ── eBay search (rate-limited to 5 RPM) ────────────────────
-def search_ebay(query, limit=5):
+def search_ebay(query, limit=5, offset=0):
     """Search eBay using the Browse API and return a list of items."""
     time.sleep(12)  # stay within 5 RPM
 
@@ -75,6 +76,7 @@ def search_ebay(query, limit=5):
         params={
             "q": query,
             "limit": limit,
+            "offset": offset,
             "fieldgroups": "MATCHING_ITEMS,EXTENDED",
         },
         timeout=15,
@@ -84,9 +86,10 @@ def search_ebay(query, limit=5):
 
     items = []
     for item in data.get("itemSummaries", []):
+        price_value = _safe_float(item.get("price", {}).get("value"))
         items.append({
             "title":     item.get("title"),
-            "price":     item.get("price", {}).get("value"),
+            "price":     price_value,
             "currency":  item.get("price", {}).get("currency"),
             "condition": item.get("condition"),
             "url":       item.get("itemWebUrl"),
@@ -127,19 +130,93 @@ def _should_search_ebay(text):
     return False
 
 
-def _format_ebay_results(items):
+def _safe_float(value):
+    try:
+        return float(str(value).replace("$", "").replace(",", "").strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _median(values):
+    if not values:
+        return None
+    values_sorted = sorted(values)
+    mid = len(values_sorted) // 2
+    if len(values_sorted) % 2 == 1:
+        return values_sorted[mid]
+    return (values_sorted[mid - 1] + values_sorted[mid]) / 2
+
+
+def _deal_label(delta_pct):
+    if delta_pct <= -20:
+        return "Great deal"
+    if delta_pct <= -10:
+        return "Good deal"
+    if delta_pct <= -5:
+        return "Fair"
+    if delta_pct <= 10:
+        return "Slightly high"
+    return "Overpriced"
+
+
+def _format_ebay_results(items, query, offset, limit):
     if not items:
-        return "No eBay results found. Try a more specific query."
+        return {
+            "text": "No eBay results found. Try a more specific query.",
+            "html": "No eBay results found. Try a more specific query.",
+        }
+
+    prices = [item.get("price") for item in items if item.get("price") is not None]
+    median_price = _median(prices)
 
     lines = ["Top eBay results:"]
+    html_lines = [
+        "<div class=\"ebay-results\">",
+        "<div class=\"ebay-summary\">Price efficiency compares each listing to the median of these results (same spec class).</div>",
+        "<ol>",
+    ]
+
     for idx, item in enumerate(items, 1):
         title = item.get("title") or "(no title)"
         price = item.get("price")
         currency = item.get("currency") or "USD"
-        price_text = f"{price} {currency}" if price is not None else "Price N/A"
+        condition = item.get("condition") or "Unknown"
         url = item.get("url") or ""
+
+        price_text = f"${price:,.2f} {currency}" if price is not None else "Price N/A"
         lines.append(f"{idx}. {title}\n   {price_text}\n   {url}")
-    return "\n".join(lines)
+
+        efficiency_text = "Efficiency: N/A"
+        if price is not None and median_price:
+            delta_pct = ((price - median_price) / median_price) * 100
+            direction = "below" if delta_pct < 0 else "above"
+            efficiency_text = f"Efficiency: {abs(delta_pct):.1f}% {direction} median ({_deal_label(delta_pct)})"
+
+        html_lines.append(
+            "<li>"
+            f"<div class=\"ebay-title\"><a href=\"{html.escape(url, quote=True)}\" target=\"_blank\" rel=\"noopener\">{html.escape(title)}</a></div>"
+            f"<div class=\"ebay-meta\">{html.escape(price_text)} | Condition: {html.escape(condition)}</div>"
+            f"<div class=\"ebay-eff\">{html.escape(efficiency_text)}</div>"
+            "</li>"
+        )
+
+    html_lines.append("</ol>")
+
+    if len(items) == limit:
+        next_offset = offset + limit
+        html_lines.append(
+            "<button class=\"load-more\" data-query=\""
+            + html.escape(query, quote=True)
+            + "\" data-offset=\""
+            + str(next_offset)
+            + "\">Load more results</button>"
+        )
+    html_lines.append("</div>")
+
+    return {
+        "text": "\n".join(lines),
+        "html": "".join(html_lines),
+    }
 
 
 @app.route("/")
@@ -151,12 +228,15 @@ def index():
 def ebay_search():
     data = request.get_json()
     query = data.get("query", "")
+    offset = int(data.get("offset", 0) or 0)
+    limit = int(data.get("limit", 5) or 5)
     if not query:
         return jsonify({"error": "No query provided"}), 400
 
     try:
-        results = search_ebay(query)
-        return jsonify({"results": results})
+        results = search_ebay(query, limit=limit, offset=offset)
+        formatted = _format_ebay_results(results, query=query, offset=offset, limit=limit)
+        return jsonify({"results": results, "reply": formatted["text"], "reply_html": formatted["html"]})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -169,8 +249,9 @@ def chat():
 
     if _should_search_ebay(user_text):
         try:
-            results = search_ebay(user_text, limit=5)
-            return jsonify({"reply": _format_ebay_results(results)})
+            results = search_ebay(user_text, limit=5, offset=0)
+            formatted = _format_ebay_results(results, query=user_text, offset=0, limit=5)
+            return jsonify({"reply": formatted["text"], "reply_html": formatted["html"]})
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 

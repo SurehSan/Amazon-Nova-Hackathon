@@ -1,3 +1,5 @@
+import os
+import re
 import time
 import base64
 import requests
@@ -9,18 +11,18 @@ app = Flask(__name__, static_folder=".")
 CORS(app)
 
 client = OpenAI(
-    base_url="https://api.nova.amazon.com/v1",
-    api_key="705c5381-57b8-4f02-b8a0-5d75988c32d4",
+    base_url=os.getenv("AMAZON_NOVA_BASE_URL", "https://api.nova.amazon.com/v1"),
+    api_key=os.getenv("AMAZON_NOVA_API_KEY", "705c5381-57b8-4f02-b8a0-5d75988c32d4"),
 )
 
 MODEL = "AGENT-0145989dba254b77afd38709902f002c"
 
 # ── eBay Browse API credentials ─────────────────────────────
-EBAY_APP_ID   = "SurehSan-Browse-SBX-dbf324dd4-c623592e"   # Client ID
-EBAY_CERT_ID  = "SBX-bf324dd4f639-0aa6-4946-8a6d-1d61"                         # Client Secret – paste your Cert ID
+EBAY_APP_ID = os.getenv("EBAY_APP_ID", "SurehSan-Browse-PRD-8bf3c6448-d5a65e34")
+EBAY_CERT_ID = os.getenv("EBAY_CERT_ID", "PRD-bf3c64488749-d9ba-41cd-8bdd-0e0a")
 
-EBAY_TOKEN_URL  = "https://api.sandbox.ebay.com/identity/v1/oauth2/token"
-EBAY_SEARCH_URL = "https://api.sandbox.ebay.com/buy/browse/v1/item_summary/search"
+EBAY_TOKEN_URL = "https://api.ebay.com/identity/v1/oauth2/token"
+EBAY_SEARCH_URL = "https://api.ebay.com/buy/browse/v1/item_summary/search"
 
 # Simple in-memory token cache
 _ebay_token_cache = {"access_token": None, "expires_at": 0}
@@ -59,7 +61,7 @@ def _get_ebay_token():
 
 # ── eBay search (rate-limited to 5 RPM) ────────────────────
 def search_ebay(query, limit=5):
-    """Search eBay sandbox using the Browse API and return a list of items."""
+    """Search eBay using the Browse API and return a list of items."""
     time.sleep(12)  # stay within 5 RPM
 
     token = _get_ebay_token()
@@ -94,6 +96,52 @@ def search_ebay(query, limit=5):
     return items
 
 
+def _extract_user_text(messages):
+    if not messages:
+        return ""
+    last = messages[-1] or {}
+    content = last.get("content")
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict):
+                if item.get("type") == "text" and item.get("text"):
+                    parts.append(item["text"])
+                elif item.get("text"):
+                    parts.append(item["text"])
+        return " ".join(parts).strip()
+    return ""
+
+
+def _should_search_ebay(text):
+    if not text:
+        return False
+    lowered = text.lower()
+    triggers = ["search", "find", "deal", "deals", "price", "prices", "ebay"]
+    if any(trigger in lowered for trigger in triggers):
+        return True
+    if re.search(r"\b(rtx|rx|ryzen|core i[3579]|i[3579]-\d{4,5})\b", lowered):
+        return True
+    return False
+
+
+def _format_ebay_results(items):
+    if not items:
+        return "No eBay results found. Try a more specific query."
+
+    lines = ["Top eBay results:"]
+    for idx, item in enumerate(items, 1):
+        title = item.get("title") or "(no title)"
+        price = item.get("price")
+        currency = item.get("currency") or "USD"
+        price_text = f"{price} {currency}" if price is not None else "Price N/A"
+        url = item.get("url") or ""
+        lines.append(f"{idx}. {title}\n   {price_text}\n   {url}")
+    return "\n".join(lines)
+
+
 @app.route("/")
 def index():
     return send_from_directory(".", "chat.html")
@@ -117,6 +165,14 @@ def ebay_search():
 def chat():
     data = request.get_json()
     messages = data.get("messages", [])
+    user_text = _extract_user_text(messages)
+
+    if _should_search_ebay(user_text):
+        try:
+            results = search_ebay(user_text, limit=5)
+            return jsonify({"reply": _format_ebay_results(results)})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
     try:
         response = client.chat.completions.create(

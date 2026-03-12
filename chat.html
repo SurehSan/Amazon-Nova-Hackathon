@@ -71,6 +71,61 @@
       text-align: center;
     }
 
+    /* ── Filter panel ───────────────────────── */
+    #filters {
+      width: 100%;
+      max-width: 800px;
+      margin: 12px auto 0;
+      padding: 12px 16px;
+      border: 1px solid #1a1a1a;
+      background: #0d0d0dc9;
+      backdrop-filter: blur(6px);
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
+    #filters label {
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #777;
+      display: block;
+      margin-bottom: 6px;
+    }
+    #filters select,
+    #filters input {
+      width: 100%;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      color: #eee;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      outline: none;
+    }
+    #filters .wide {
+      grid-column: 1 / -1;
+    }
+    #filters .inline {
+      display: flex;
+      gap: 8px;
+    }
+    #filters .inline input {
+      flex: 1;
+    }
+    #filters .checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #bbb;
+    }
+    #filters .checkbox input {
+      width: 16px;
+      height: 16px;
+    }
+
     /* ── Chat area ──────────────────────────── */
     #chat {
       flex: 1 1 auto;
@@ -663,6 +718,75 @@
     </div>
   </header>
 
+  <div id="filters">
+    <div>
+      <label for="product-type">Looking for</label>
+      <select id="product-type">
+        <option value="">Any</option>
+        <option value="card">Graphics card</option>
+        <option value="desktop">Desktop</option>
+        <option value="laptop">Laptop</option>
+      </select>
+    </div>
+    <div>
+      <label for="brand">Brand</label>
+      <select id="brand">
+        <option value="any">Any</option>
+        <option value="NVIDIA">NVIDIA</option>
+        <option value="AMD">AMD</option>
+        <option value="Intel">Intel</option>
+        <option value="Apple">Apple</option>
+      </select>
+    </div>
+    <div>
+      <label for="model">Model or range</label>
+      <input id="model" type="text" placeholder="RTX 4080 / RX 6800 XT" />
+    </div>
+    <div>
+      <label for="tier">Performance tier</label>
+      <select id="tier">
+        <option value="">Any</option>
+        <option value="budget">Budget</option>
+        <option value="mid">Mid</option>
+        <option value="high">High-end</option>
+        <option value="enthusiast">Enthusiast</option>
+      </select>
+    </div>
+    <div>
+      <label>Price range (USD)</label>
+      <div class="inline">
+        <input id="min-price" type="number" min="0" placeholder="Min" />
+        <input id="max-price" type="number" min="0" placeholder="Max" />
+      </div>
+    </div>
+    <div>
+      <label for="delivery-days">Delivery time</label>
+      <select id="delivery-days">
+        <option value="">Any</option>
+        <option value="3"><= 3 days</option>
+        <option value="7"><= 7 days</option>
+        <option value="14"><= 14 days</option>
+      </select>
+    </div>
+    <div>
+      <label for="condition">Condition</label>
+      <select id="condition">
+        <option value="any">Any</option>
+        <option value="new">New</option>
+        <option value="used">Used</option>
+        <option value="parts">For parts</option>
+      </select>
+    </div>
+    <div class="checkbox">
+      <input id="exclude-local" type="checkbox" />
+      <label for="exclude-local">Exclude local pickup</label>
+    </div>
+    <div class="wide">
+      <label for="notes">Other must-haves</label>
+      <input id="notes" type="text" placeholder="Example: include original box, warranty, low hours" />
+    </div>
+  </div>
+
   <div id="chat"></div>
 
   <div id="img-preview"></div>
@@ -686,6 +810,19 @@
     const imgBtn = document.getElementById("img-btn");
     const imgInput = document.getElementById("img-input");
     const imgPreview = document.getElementById("img-preview");
+    const productTypeEl = document.getElementById("product-type");
+    const brandEl = document.getElementById("brand");
+    const modelEl = document.getElementById("model");
+    const tierEl = document.getElementById("tier");
+    const minPriceEl = document.getElementById("min-price");
+    const maxPriceEl = document.getElementById("max-price");
+    const deliveryDaysEl = document.getElementById("delivery-days");
+    const conditionEl = document.getElementById("condition");
+    const excludeLocalEl = document.getElementById("exclude-local");
+    const notesEl = document.getElementById("notes");
+
+    let lastSearchFilters = null;
+    let lastSearchQuery = "";
 
     let messages = [];   // conversation history sent to API
     let pendingImages = [];  // base64 data URLs of attached images
@@ -808,9 +945,33 @@
       return div;
     }
 
+    function collectFilters() {
+      return {
+        product_type: productTypeEl.value,
+        brand: brandEl.value,
+        model: modelEl.value.trim(),
+        tier: tierEl.value,
+        min_price: minPriceEl.value,
+        max_price: maxPriceEl.value,
+        delivery_days: deliveryDaysEl.value,
+        condition: conditionEl.value,
+        exclude_local: excludeLocalEl.checked,
+        notes: notesEl.value.trim()
+      };
+    }
+
     async function handleLoadMore(button) {
-      const query = button.getAttribute("data-query") || "";
+      const query = button.getAttribute("data-query") || lastSearchQuery;
       const offset = parseInt(button.getAttribute("data-offset") || "0", 10);
+      const filtersAttr = button.getAttribute("data-filters");
+      let filters = lastSearchFilters || {};
+      if (filtersAttr) {
+        try {
+          filters = JSON.parse(filtersAttr);
+        } catch (e) {
+          filters = lastSearchFilters || {};
+        }
+      }
 
       if (!query) return;
       button.disabled = true;
@@ -820,7 +981,7 @@
         const res = await fetch("/api/ebay", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query, offset, limit: 5 }),
+          body: JSON.stringify({ query, offset, limit: 5, filters }),
         });
         const data = await res.json();
         if (data.error) {
@@ -866,6 +1027,7 @@
       });
       if (text) content.push({ type: "text", text: text });
 
+      const filters = collectFilters();
       messages.push({ role: "user", content: content.length === 1 && !images.length ? text : content });
 
       showTyping();
@@ -874,7 +1036,7 @@
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages }),
+          body: JSON.stringify({ messages, filters }),
         });
         const data = await res.json();
         hideTyping();
@@ -886,6 +1048,8 @@
           chat.appendChild(errDiv);
         } else {
           addMsg("assistant", data.reply, null, data.reply_html);
+          lastSearchFilters = filters;
+          lastSearchQuery = text;
           const assistantText = data.reply || "eBay results returned.";
           messages.push({ role: "assistant", content: assistantText });
         }

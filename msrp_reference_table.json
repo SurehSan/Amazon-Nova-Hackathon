@@ -1,0 +1,277 @@
+{
+  "schema_version": "1.0",
+  "last_updated": "2026-03-06",
+  "currency": "USD",
+  "purpose": "Static retail ceiling reference for PartPulse deal analysis",
+  "live_price_refresh": {
+    "refreshed_at": "2026-03-06",
+    "scope": [
+      "GPU",
+      "CPU"
+    ],
+    "source": "bestvaluegpu.com + bestvaluecpu.com (Amazon-linked daily tracker)",
+    "note": "RAM/PSU/Storage retained from prior baseline due retailer anti-bot blocking on direct endpoints during this run"
+  },
+  "total_parts": 40,
+  "parts": [
+    {
+      "category": "GPU",
+      "model": "RTX 4090",
+      "retail_price_ceiling_usd": 2200,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "GPU",
+      "model": "RTX 4080 Super",
+      "retail_price_ceiling_usd": 949.99,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "GPU",
+      "model": "RTX 4070 Ti Super",
+      "retail_price_ceiling_usd": 749,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "GPU",
+      "model": "RTX 4070 Super",
+      "retail_price_ceiling_usd": 480,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "GPU",
+      "model": "RTX 4070",
+      "retail_price_ceiling_usd": 495.99,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "GPU",
+      "model": "RTX 4060 Ti",
+      "retail_price_ceiling_usd": 265,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "GPU",
+      "model": "RTX 4060",
+      "retail_price_ceiling_usd": 240,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "GPU",
+      "model": "RX 7900 XTX",
+      "retail_price_ceiling_usd": 850,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "GPU",
+      "model": "RX 7900 XT",
+      "retail_price_ceiling_usd": 574.99,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "GPU",
+      "model": "RX 7800 XT",
+      "retail_price_ceiling_usd": 459.99,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "GPU",
+      "model": "RX 7700 XT",
+      "retail_price_ceiling_usd": 350,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "GPU",
+      "model": "RX 6700 XT",
+      "retail_price_ceiling_usd": 230,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "CPU",
+      "model": "Ryzen 9 7950X",
+      "retail_price_ceiling_usd": 625.99,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "CPU",
+      "model": "Ryzen 9 7900X",
+      "retail_price_ceiling_usd": 309.95,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "CPU",
+      "model": "Ryzen 7 7700X",
+      "retail_price_ceiling_usd": 247.49,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "CPU",
+      "model": "Ryzen 5 7600X",
+      "retail_price_ceiling_usd": 175,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "CPU",
+      "model": "Ryzen 7 7800X3D",
+      "retail_price_ceiling_usd": 368.99,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "CPU",
+      "model": "Core i9-14900K",
+      "retail_price_ceiling_usd": 468.99,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "CPU",
+      "model": "Core i7-14700K",
+      "retail_price_ceiling_usd": 344.57,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "CPU",
+      "model": "Core i5-14600K",
+      "retail_price_ceiling_usd": 270.99,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "CPU",
+      "model": "Core i5-13600K",
+      "retail_price_ceiling_usd": 319,
+      "notes": "Live tracked new price (Mar 6, 2026)"
+    },
+    {
+      "category": "RAM",
+      "model": "DDR5 32GB (2x16) 5200",
+      "retail_price_ceiling_usd": 89,
+      "price_per_gb_usd": 2.78,
+      "notes": "Benchmark tier"
+    },
+    {
+      "category": "RAM",
+      "model": "DDR5 32GB (2x16) 5600",
+      "retail_price_ceiling_usd": 99,
+      "price_per_gb_usd": 3.09,
+      "notes": "Benchmark tier"
+    },
+    {
+      "category": "RAM",
+      "model": "DDR5 32GB (2x16) 6000 CL30",
+      "retail_price_ceiling_usd": 119,
+      "price_per_gb_usd": 3.72,
+      "notes": "Benchmark tier"
+    },
+    {
+      "category": "RAM",
+      "model": "DDR5 32GB (2x16) 6400",
+      "retail_price_ceiling_usd": 129,
+      "price_per_gb_usd": 4.03,
+      "notes": "Benchmark tier"
+    },
+    {
+      "category": "RAM",
+      "model": "DDR4 32GB (2x16) 3200",
+      "retail_price_ceiling_usd": 59,
+      "price_per_gb_usd": 1.84,
+      "notes": "Benchmark tier"
+    },
+    {
+      "category": "RAM",
+      "model": "DDR4 32GB (2x16) 3600",
+      "retail_price_ceiling_usd": 69,
+      "price_per_gb_usd": 2.16,
+      "notes": "Benchmark tier"
+    },
+    {
+      "category": "PSU",
+      "model": "Corsair RM650e 650W 80+ Gold",
+      "retail_price_ceiling_usd": 99,
+      "wattage": 650,
+      "notes": "Top-tier consumer brand"
+    },
+    {
+      "category": "PSU",
+      "model": "Corsair RM750e 750W 80+ Gold",
+      "retail_price_ceiling_usd": 119,
+      "wattage": 750,
+      "notes": "Top-tier consumer brand"
+    },
+    {
+      "category": "PSU",
+      "model": "Corsair RM850x 850W 80+ Gold",
+      "retail_price_ceiling_usd": 149,
+      "wattage": 850,
+      "notes": "Top-tier consumer brand"
+    },
+    {
+      "category": "PSU",
+      "model": "Seasonic Focus GX-750 750W 80+ Gold",
+      "retail_price_ceiling_usd": 129,
+      "wattage": 750,
+      "notes": "Top-tier consumer brand"
+    },
+    {
+      "category": "PSU",
+      "model": "Seasonic Focus GX-850 850W 80+ Gold",
+      "retail_price_ceiling_usd": 149,
+      "wattage": 850,
+      "notes": "Top-tier consumer brand"
+    },
+    {
+      "category": "PSU",
+      "model": "be quiet! Pure Power 12 M 850W 80+ Gold",
+      "retail_price_ceiling_usd": 139,
+      "wattage": 850,
+      "notes": "Top-tier consumer brand"
+    },
+    {
+      "category": "PSU",
+      "model": "EVGA SuperNOVA 1000 G6 1000W 80+ Gold",
+      "retail_price_ceiling_usd": 179,
+      "wattage": 1000,
+      "notes": "Top-tier consumer brand"
+    },
+    {
+      "category": "Storage",
+      "model": "Samsung 990 PRO 1TB NVMe",
+      "retail_price_ceiling_usd": 109,
+      "capacity_tb": 1,
+      "notes": "Top-tier Gen4 NVMe"
+    },
+    {
+      "category": "Storage",
+      "model": "Samsung 990 PRO 2TB NVMe",
+      "retail_price_ceiling_usd": 169,
+      "capacity_tb": 2,
+      "notes": "Top-tier Gen4 NVMe"
+    },
+    {
+      "category": "Storage",
+      "model": "WD Black SN850X 1TB NVMe",
+      "retail_price_ceiling_usd": 99,
+      "capacity_tb": 1,
+      "notes": "Top-tier Gen4 NVMe"
+    },
+    {
+      "category": "Storage",
+      "model": "WD Black SN850X 2TB NVMe",
+      "retail_price_ceiling_usd": 159,
+      "capacity_tb": 2,
+      "notes": "Top-tier Gen4 NVMe"
+    },
+    {
+      "category": "Storage",
+      "model": "Crucial T500 1TB NVMe",
+      "retail_price_ceiling_usd": 89,
+      "capacity_tb": 1,
+      "notes": "Top-tier Gen4 NVMe"
+    },
+    {
+      "category": "Storage",
+      "model": "Crucial T500 2TB NVMe",
+      "retail_price_ceiling_usd": 139,
+      "capacity_tb": 2,
+      "notes": "Top-tier Gen4 NVMe"
+    }
+  ]
+}

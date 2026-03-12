@@ -1,17 +1,23 @@
+import json
+import os
 import time
+from dotenv import load_dotenv
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from openai import OpenAI
+from lambda_function import lambda_handler
+
+load_dotenv()
 
 app = Flask(__name__, static_folder=".")
 CORS(app)
 
 client = OpenAI(
-    base_url="https://api.nova.amazon.com/v1",
-    api_key="705c5381-57b8-4f02-b8a0-5d75988c32d4",
+    base_url=os.getenv("NOVA_BASE_URL", "https://api.nova.amazon.com/v1"),
+    api_key=os.getenv("NOVA_API_KEY", ""),
 )
 
-MODEL = "AGENT-0145989dba254b77afd38709902f002c"
+MODEL = os.getenv("NOVA_MODEL", "AGENT-0145989dba254b77afd38709902f002c")
 
 
 # ── eBay search (rate-limited to 5 RPM) ────────────────────
@@ -45,6 +51,9 @@ def chat():
     messages = data.get("messages", [])
 
     try:
+        if not os.getenv("NOVA_API_KEY"):
+            return jsonify({"error": "NOVA_API_KEY is not configured"}), 500
+
         response = client.chat.completions.create(
             model=MODEL,
             messages=messages,
@@ -53,6 +62,26 @@ def chat():
         return jsonify({"reply": reply})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/analyze", methods=["POST", "OPTIONS"])
+def analyze_listing():
+    event = {
+        "httpMethod": request.method,
+        "body": json.dumps(request.get_json(silent=True) or {}),
+    }
+    lambda_response = lambda_handler(event, None)
+
+    status_code = lambda_response.get("statusCode", 500)
+    response_body = lambda_response.get("body", "{}")
+    headers = lambda_response.get("headers", {})
+
+    try:
+        response_json = json.loads(response_body)
+    except json.JSONDecodeError:
+        response_json = {"error": response_body}
+
+    return jsonify(response_json), status_code, headers
 
 
 if __name__ == "__main__":

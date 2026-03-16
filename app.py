@@ -23,7 +23,8 @@ MODEL = "AGENT-0145989dba254b77afd38709902f002c"
 GUIDE_SYSTEM_PROMPT = (
     "You are HardPulse, a hardware-finding assistant. Guide the user step-by-step before searching listings. "
     "Start by understanding what they want, then ask concise follow-up questions when needed (budget, condition, performance target, desktop/laptop/card, and urgency). "
-    "Never provide direct product/listing links yourself. If the user wants listings, ask them to request an eBay search."
+    "Never provide direct product/listing links yourself and never output marketplace results. "
+    "In every response, include one short line: 'When you're ready for live deals, type: Search now.'"
 )
 
 # ── eBay Browse API credentials ─────────────────────────────
@@ -238,11 +239,10 @@ def search_ebay(query, limit=5, offset=0):
     return items
 
 
-def _extract_user_text(messages):
-    if not messages:
+def _extract_message_text(message):
+    if not isinstance(message, dict):
         return ""
-    last = messages[-1] or {}
-    content = last.get("content")
+    content = message.get("content")
     if isinstance(content, str):
         return content.strip()
     if isinstance(content, list):
@@ -257,29 +257,34 @@ def _extract_user_text(messages):
     return ""
 
 
-def _should_search_ebay(text):
-    if not text:
-        return False
-    lowered = text.lower()
-    triggers = [
-        "search ebay",
-        "search for",
-        "find deals",
-        "find me",
-        "show listings",
-        "search now",
-        "look it up on ebay",
-        "ebay search",
-        "best price",
-        "buy",
-    ]
-    if any(trigger in lowered for trigger in triggers):
-        return True
-    if re.fullmatch(r"\d{4}", lowered.strip()):
-        return True
-    if any(token in lowered for token in ["rtx", "gtx", "rx ", "ryzen", "core i", "gpu", "graphics card"]):
-        return True
-    return False
+def _extract_user_text(messages):
+    if not messages:
+        return ""
+    last = messages[-1] or {}
+    return _extract_message_text(last)
+
+
+def _is_search_now_command(text):
+    return bool(re.match(r"^\s*search\s+now\s*[.!?]*\s*$", text or "", flags=re.IGNORECASE))
+
+
+def _extract_search_context(messages):
+    if not isinstance(messages, list):
+        return ""
+
+    user_texts = []
+    for message in messages:
+        if isinstance(message, dict) and message.get("role") == "user":
+            text = _extract_message_text(message)
+            if not text:
+                continue
+            if _is_search_now_command(text):
+                continue
+            user_texts.append(text)
+
+    if not user_texts:
+        return ""
+    return " ".join(user_texts[-3:]).strip()
 
 
 def _strip_links_from_text(text):
@@ -667,9 +672,13 @@ def chat():
     filters = _normalize_filters(data.get("filters") or {})
     user_text = _extract_user_text(messages)
 
-    query = _build_search_query(user_text, filters)
-
-    if _should_search_ebay(query):
+    if _is_search_now_command(user_text):
+        search_context = _extract_search_context(messages)
+        query = _build_search_query(search_context, filters)
+        if not query:
+            return jsonify({
+                "reply": "Tell me what hardware you want first, then type: Search now.",
+            })
         try:
             results = search_ebay(query, limit=5, offset=0)
             filtered = _apply_post_filters(results, filters)

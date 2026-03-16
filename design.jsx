@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const HardPulseSymbol = () => {
+const CacheHuntSymbol = () => {
   const [animated, setAnimated] = useState(false);
 
   useEffect(() => {
@@ -238,4 +238,4 @@ const HardPulseSymbol = () => {
   );
 };
 
-export default HardPulseSymbol;
+export default CacheHuntSymbol;

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HardPulse</title>
+  <title>CacheHunt</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -872,7 +872,7 @@
 
     <div>
       <div class="splash-wordmark">
-        <span class="hard">HARD</span><span class="pulse">PULSE</span>
+        <span class="hard">Cache</span><span class="pulse">Hunt</span>
       </div>
       <div class="splash-tagline">The software that finds your hardware</div>
     </div>
@@ -889,7 +889,7 @@
   <header>
     <div>
       <div class="logo-text">
-        <span class="hard">HARD</span><span class="pulse">PULSE</span>
+        <span class="hard">Cache</span><span class="pulse">Hunt</span>
         <span class="pulse-dot"></span>
       </div>
       <div class="tagline">The software that finds your hardware</div>
@@ -907,7 +907,7 @@
           </svg>
         </button>
         <input type="file" id="img-input" accept="image/*" multiple hidden />
-        <textarea id="prompt" rows="1" placeholder="Ask HardPulse anything... (paste or attach images)" autofocus></textarea>
+        <textarea id="prompt" rows="1" placeholder="Ask CacheHunt anything... (paste or attach images)" autofocus></textarea>
         <button id="send-btn">Send</button>
       </div>
     </div>
@@ -1097,7 +1097,7 @@
       div.className = "msg " + role;
       const label = document.createElement("span");
       label.className = "label";
-      label.textContent = role === "user" ? "You" : "HardPulse";
+      label.textContent = role === "user" ? "You" : "CacheHunt";
       div.appendChild(label);
       if (images && images.length) {
         images.forEach(src => {
@@ -1269,7 +1269,7 @@
       "Booting diagnostics...",
       "Spinning floppy platter...",
       "Calibrating read heads...",
-      "Loading HardPulse UI..."
+      "Loading CacheHunt UI..."
     ];
 
     let bootIndex = 0;

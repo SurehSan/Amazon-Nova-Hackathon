@@ -24,7 +24,7 @@ client = OpenAI(
 MODEL = "AGENT-0145989dba254b77afd38709902f002c"
 
 GUIDE_SYSTEM_PROMPT = (
-    "You are HardPulse, a hardware-finding assistant. Guide the user step-by-step before searching listings. "
+    "You are CacheHunt, a hardware-finding assistant. Guide the user step-by-step before searching listings. "
     "Start by understanding what they want, then ask concise follow-up questions when needed (budget, condition, performance target, desktop/laptop/card, and urgency). "
     "Never provide direct product/listing links yourself and never output marketplace results. "
     "In every response, include one short line: 'When you're ready for live deals, type: Search now.'"
@@ -456,8 +456,8 @@ def _build_search_query(user_text, filters):
     for brand in brands:
         if isinstance(brand, str) and brand.lower() != "any":
             tokens.append(brand)
-    if model:
-        tokens.append(model)
+    # model is appended later only if not already in the base text
+    # (stored for dedup check below)
 
     tier_map = {
         "budget": "budget",
@@ -474,6 +474,11 @@ def _build_search_query(user_text, filters):
 
     combined = " ".join(token for token in tokens if token)
     base = _strip_non_product_terms(user_text)
+
+    # Append model only if it isn't already present in the base text
+    if model and model.lower() not in base.lower():
+        combined = f"{combined} {model}".strip() if combined else model
+
     if base and combined:
         query = f"{base} {combined}".strip()
     elif combined:
@@ -599,9 +604,9 @@ def _apply_post_filters(items, filters):
             item_condition = (item.get("condition") or "").lower()
             condition_match = False
             for condition in active_conditions:
-                if condition == "new" and "new" in item_condition:
+                if condition == "new" and any(kw in item_condition for kw in ["new", "open box", "sealed"]):
                     condition_match = True
-                elif condition == "used" and "used" in item_condition:
+                elif condition == "used" and any(kw in item_condition for kw in ["used", "pre-owned", "open box", "refurbished"]):
                     condition_match = True
                 elif condition == "parts" and ("parts" in item_condition or "not working" in item_condition):
                     condition_match = True

@@ -298,6 +298,25 @@ def _is_search_now_command(text):
     return bool(re.match(r"^\s*search\s+now\s*[.!?]*\s*$", text or "", flags=re.IGNORECASE))
 
 
+def _is_more_results_command(text):
+    return bool(re.match(
+        r"^\s*(?:(?:show|load|get|give|find)\s+)?(?:more|next|additional)\s*(?:results?|listings?|deals?|options?)?\s*[.!?]*\s*$",
+        text or "", flags=re.IGNORECASE,
+    ))
+
+
+def _count_previous_ebay_batches(messages):
+    """Count how many eBay result batches have been sent in the conversation."""
+    count = 0
+    for msg in (messages or []):
+        if not isinstance(msg, dict) or msg.get("role") != "assistant":
+            continue
+        text = _extract_message_text(msg)
+        if "Top eBay results" in text or "ebay-results" in text:
+            count += 1
+    return count
+
+
 def _extract_search_context(messages):
     if not isinstance(messages, list):
         return ""
@@ -308,7 +327,7 @@ def _extract_search_context(messages):
             text = _extract_message_text(message)
             if not text:
                 continue
-            if _is_search_now_command(text):
+            if _is_search_now_command(text) or _is_more_results_command(text):
                 continue
             user_texts.append(text)
 
@@ -790,7 +809,7 @@ def chat():
     filters = _normalize_filters(data.get("filters") or {})
     user_text = _extract_user_text(messages)
 
-    if _is_search_now_command(user_text):
+    if _is_search_now_command(user_text) or _is_more_results_command(user_text):
         search_context = _extract_search_context(messages)
         inferred_filters = _infer_filters_from_text(search_context)
         effective_filters = _merge_filters(inferred_filters, filters)
@@ -799,11 +818,18 @@ def chat():
             return jsonify({
                 "reply": "Tell me what hardware you want first, then type: Search now.",
             })
+
+        # For "more results", calculate offset from previous batches
+        offset = 0
+        if _is_more_results_command(user_text):
+            previous_batches = _count_previous_ebay_batches(messages)
+            offset = max(previous_batches, 1) * 5
+
         try:
-            results = search_ebay(query, limit=5, offset=0, filters=effective_filters)
+            results = search_ebay(query, limit=5, offset=offset, filters=effective_filters)
             filtered = _apply_post_filters(results, effective_filters)
-            formatted = _format_ebay_results(filtered, query=query, offset=0, limit=5, filters=effective_filters)
-            thinking = _build_ebay_thinking_payload(query=query, limit=5, offset=0, filters=effective_filters)
+            formatted = _format_ebay_results(filtered, query=query, offset=offset, limit=5, filters=effective_filters)
+            thinking = _build_ebay_thinking_payload(query=query, limit=5, offset=offset, filters=effective_filters)
             return jsonify({"reply": formatted["text"], "reply_html": formatted["html"], "thinking": thinking})
         except Exception as e:
             return jsonify({"error": str(e)}), 500

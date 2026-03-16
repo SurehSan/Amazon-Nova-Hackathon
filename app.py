@@ -6,16 +6,19 @@ import base64
 import html
 import requests
 from urllib.parse import urlparse
+from dotenv import load_dotenv
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from openai import OpenAI
+
+load_dotenv()
 
 app = Flask(__name__, static_folder=".")
 CORS(app)
 
 client = OpenAI(
     base_url=os.getenv("AMAZON_NOVA_BASE_URL", "https://api.nova.amazon.com/v1"),
-    api_key=os.getenv("AMAZON_NOVA_API_KEY", "705c5381-57b8-4f02-b8a0-5d75988c32d4"),
+    api_key=os.getenv("AMAZON_NOVA_API_KEY"),
 )
 
 MODEL = "AGENT-0145989dba254b77afd38709902f002c"
@@ -28,8 +31,8 @@ GUIDE_SYSTEM_PROMPT = (
 )
 
 # ── eBay Browse API credentials ─────────────────────────────
-EBAY_APP_ID = os.getenv("EBAY_APP_ID", "SurehSan-Browse-PRD-8bf3c6448-d5a65e34")
-EBAY_CERT_ID = os.getenv("EBAY_CERT_ID", "PRD-bf3c64488749-d9ba-41cd-8bdd-0e0a")
+EBAY_APP_ID = os.getenv("EBAY_APP_ID")
+EBAY_CERT_ID = os.getenv("EBAY_CERT_ID")
 
 EBAY_TOKEN_URL = "https://api.ebay.com/identity/v1/oauth2/token"
 EBAY_SEARCH_URL = "https://api.ebay.com/buy/browse/v1/item_summary/search"
@@ -189,12 +192,44 @@ def _pick_live_listing_url(item):
 
 
 # ── eBay search (rate-limited to 5 RPM) ────────────────────
-def search_ebay(query, limit=5, offset=0):
+def search_ebay(query, limit=5, offset=0, filters=None):
     """Search eBay using the Browse API and return a list of items."""
     time.sleep(12)  # stay within 5 RPM
 
     token = _get_ebay_token()
     page_limit = min(max(int(limit), 1), 50)
+
+    # Build eBay filter string for price range and condition
+    ebay_filters = []
+    if filters:
+        min_price = _safe_float(filters.get("min_price"))
+        max_price = _safe_float(filters.get("max_price"))
+        if min_price is not None and max_price is not None:
+            ebay_filters.append(f"price:[{min_price}..{max_price}],priceCurrency:USD")
+        elif min_price is not None:
+            ebay_filters.append(f"price:[{min_price}],priceCurrency:USD")
+        elif max_price is not None:
+            ebay_filters.append(f"price:[..{max_price}],priceCurrency:USD")
+
+        condition_map = {"new": "NEW", "used": "USED", "refurbished": "REFURBISHED"}
+        condition_values = _as_list(filters.get("condition"))
+        ebay_conditions = []
+        for c in condition_values:
+            mapped = condition_map.get(str(c).lower().strip())
+            if mapped:
+                ebay_conditions.append(mapped)
+        if ebay_conditions:
+            ebay_filters.append("conditions:{" + "|".join(ebay_conditions) + "}")
+
+    params = {
+        "q": query,
+        "limit": page_limit,
+        "offset": offset,
+        "fieldgroups": "MATCHING_ITEMS,EXTENDED",
+    }
+    if ebay_filters:
+        params["filter"] = ",".join(ebay_filters)
+
     resp = requests.get(
         EBAY_SEARCH_URL,
         headers={
@@ -202,12 +237,7 @@ def search_ebay(query, limit=5, offset=0):
             "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
             "Content-Type": "application/json",
         },
-        params={
-            "q": query,
-            "limit": page_limit,
-            "offset": offset,
-            "fieldgroups": "MATCHING_ITEMS,EXTENDED",
-        },
+        params=params,
         timeout=15,
     )
     resp.raise_for_status()
@@ -327,6 +357,59 @@ def _normalize_filters(filters):
     return clean
 
 
+def _merge_filters(base_filters, override_filters):
+    merged = dict(base_filters or {})
+    for key, value in (override_filters or {}).items():
+        if value in (None, "", []):
+            continue
+        merged[key] = value
+    return merged
+
+
+def _infer_filters_from_text(search_context):
+    text = (search_context or "").lower()
+    inferred = {}
+
+    model_match = re.search(r"\b(rtx\s?\d{4}(?:\s?(?:ti|super|ti\s?super))?)\b", text)
+    if not model_match:
+        model_match = re.search(r"\b(rx\s?\d{4}\s?(?:xtx|xt)?)\b", text)
+    if model_match:
+        inferred["model"] = re.sub(r"\s+", " ", model_match.group(1)).upper().strip()
+
+    max_price = None
+    price_patterns = [
+        r"(?:max(?:imum)?|under|below|less than|up to)\s*\$?\s*(\d{2,6}(?:\.\d{1,2})?)",
+        r"(\d{2,6}(?:\.\d{1,2})?)\s*dollars?",
+        r"\$\s*(\d{2,6}(?:\.\d{1,2})?)",
+        r"budget\s*(?:is|of|:)?\s*\$?\s*(\d{2,6}(?:\.\d{1,2})?)",
+    ]
+    for pattern in price_patterns:
+        match = re.search(pattern, text)
+        if match:
+            value = _safe_float(match.group(1))
+            if value is not None:
+                max_price = value if max_price is None else min(max_price, value)
+    if max_price is not None:
+        inferred["max_price"] = max_price
+
+    conditions = []
+    if "brand new" in text or "new condition" in text or re.search(r"\bnew\b", text):
+        conditions.append("new")
+    if "used" in text:
+        conditions.append("used")
+    if "refurb" in text:
+        conditions.append("used")
+    if "for parts" in text or "not working" in text:
+        conditions.append("parts")
+    if conditions:
+        inferred["condition"] = sorted(set(conditions))
+
+    if "local pickup" in text or "pickup only" in text:
+        inferred["exclude_local"] = True
+
+    return inferred
+
+
 def _as_list(value):
     if isinstance(value, list):
         return value
@@ -371,7 +454,7 @@ def _build_search_query(user_text, filters):
         tokens.append(notes)
 
     combined = " ".join(token for token in tokens if token)
-    base = (user_text or "").strip()
+    base = _strip_non_product_terms(user_text)
     if base and combined:
         query = f"{base} {combined}".strip()
     elif combined:
@@ -382,34 +465,66 @@ def _build_search_query(user_text, filters):
     return _normalize_ebay_query(query)
 
 
+def _strip_non_product_terms(text):
+    """Remove budget, condition, intent, and conversational filler from query text."""
+    cleaned = (text or "").lower()
+
+    # Strip price / budget phrases
+    price_patterns = [
+        r"(?:max(?:imum)?|under|below|less than|up to|around|about)\s*\$?\s*\d{2,6}(?:\.\d{1,2})?\s*(?:dollars?|usd|bucks?)?",
+        r"\$\s*\d{2,6}(?:\.\d{1,2})?",
+        r"\d{2,6}(?:\.\d{1,2})?\s*dollars?\b",
+        r"budget\s*(?:is|of|:)?\s*\$?\s*\d{2,6}(?:\.\d{1,2})?(?:\s*(?:dollars?|usd))?",
+    ]
+    for pattern in price_patterns:
+        cleaned = re.sub(pattern, " ", cleaned)
+
+    # Strip condition phrases
+    condition_phrases = [
+        r"\bbrand\s*new\b", r"\bnew\s+condition\b", r"\bnew\b",
+        r"\bused\b", r"\brefurbished\b", r"\brefurb\b",
+        r"\bfor\s+parts\b", r"\bnot\s+working\b", r"\bas[\s-]?is\b",
+        r"\blike\s+new\b", r"\bopen\s+box\b", r"\bcertified\b",
+    ]
+    for pattern in condition_phrases:
+        cleaned = re.sub(pattern, " ", cleaned)
+
+    # Strip intent / filler phrases
+    intent_phrases = [
+        r"\bprofessional\s+work\b", r"\bfor\s+gaming\b", r"\bfor\s+work\b",
+        r"\bfor\s+streaming\b", r"\bfor\s+editing\b", r"\bfor\s+school\b",
+        r"\bi\s+need\b", r"\bi\s+want\b", r"\blooking\s+for\b",
+        r"\bsearch\s+(?:ebay|now)\b", r"\bebay\s+search\b",
+        r"\bshow\s+listings\b", r"\bfind\s+deals\b",
+        r"\blook\s+it\s+up\s+on\s+ebay\b",
+        r"\bplease\b", r"\basap\b", r"\burgent(?:ly)?\b",
+        r"\bdesktop\b", r"\blaptop\b",
+    ]
+    for pattern in intent_phrases:
+        cleaned = re.sub(pattern, " ", cleaned)
+
+    # Strip stray punctuation and collapse whitespace
+    cleaned = re.sub(r"[,.:;!?]+", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+
+    return cleaned
+
+
 def _normalize_ebay_query(query):
-    query = (query or "").strip()
+    query = _strip_non_product_terms(query)
     if not query:
         return query
 
-    lowered = query.lower()
-    for phrase in [
-        "search ebay",
-        "ebay search",
-        "search now",
-        "show listings",
-        "find deals",
-        "look it up on ebay",
-    ]:
-        lowered = lowered.replace(phrase, " ")
+    if re.fullmatch(r"\d{4}", query):
+        return f"rtx {query} graphics card"
 
-    lowered = re.sub(r"\s+", " ", lowered).strip()
+    if re.search(r"\b\d{4}\b", query) and not any(term in query for term in ["rtx", "gtx", "rx", "ryzen", "intel", "amd"]):
+        query = f"{query} graphics card pc"
 
-    if re.fullmatch(r"\d{4}", lowered):
-        return f"rtx {lowered} graphics card"
+    if not any(term in query for term in _HARDWARE_HINT_TERMS):
+        query = f"{query} computer hardware pc part"
 
-    if re.search(r"\b\d{4}\b", lowered) and not any(term in lowered for term in ["rtx", "gtx", "rx", "ryzen", "intel", "amd"]):
-        lowered = f"{lowered} graphics card pc"
-
-    if not any(term in lowered for term in _HARDWARE_HINT_TERMS):
-        lowered = f"{lowered} computer hardware pc part"
-
-    return lowered.strip()
+    return query.strip()
 
 
 def _is_hardware_listing(title):
@@ -477,10 +592,13 @@ def _apply_post_filters(items, filters):
             title_lower = title.lower()
             if "local pickup" in title_lower or "pickup only" in title_lower:
                 continue
-        if min_price is not None and item.get("price") is not None and item["price"] < min_price:
-            continue
-        if max_price is not None and item.get("price") is not None and item["price"] > max_price:
-            continue
+        item_price = item.get("price")
+        if min_price is not None:
+            if item_price is None or item_price < min_price:
+                continue
+        if max_price is not None:
+            if item_price is None or item_price > max_price:
+                continue
         filtered.append(item)
     return filtered
 
@@ -651,7 +769,7 @@ def ebay_search():
         return jsonify({"error": "No query provided"}), 400
 
     try:
-        results = search_ebay(query, limit=limit, offset=offset)
+        results = search_ebay(query, limit=limit, offset=offset, filters=filters)
         filtered = _apply_post_filters(results, filters)
         formatted = _format_ebay_results(filtered, query=query, offset=offset, limit=limit, filters=filters)
         thinking = _build_ebay_thinking_payload(query=query, limit=limit, offset=offset, filters=filters)
@@ -674,16 +792,18 @@ def chat():
 
     if _is_search_now_command(user_text):
         search_context = _extract_search_context(messages)
-        query = _build_search_query(search_context, filters)
+        inferred_filters = _infer_filters_from_text(search_context)
+        effective_filters = _merge_filters(inferred_filters, filters)
+        query = _build_search_query(search_context, effective_filters)
         if not query:
             return jsonify({
                 "reply": "Tell me what hardware you want first, then type: Search now.",
             })
         try:
-            results = search_ebay(query, limit=5, offset=0)
-            filtered = _apply_post_filters(results, filters)
-            formatted = _format_ebay_results(filtered, query=query, offset=0, limit=5, filters=filters)
-            thinking = _build_ebay_thinking_payload(query=query, limit=5, offset=0, filters=filters)
+            results = search_ebay(query, limit=5, offset=0, filters=effective_filters)
+            filtered = _apply_post_filters(results, effective_filters)
+            formatted = _format_ebay_results(filtered, query=query, offset=0, limit=5, filters=effective_filters)
+            thinking = _build_ebay_thinking_payload(query=query, limit=5, offset=0, filters=effective_filters)
             return jsonify({"reply": formatted["text"], "reply_html": formatted["html"], "thinking": thinking})
         except Exception as e:
             return jsonify({"error": str(e)}), 500

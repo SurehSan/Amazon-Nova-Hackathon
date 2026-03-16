@@ -193,7 +193,7 @@ def search_ebay(query, limit=5, offset=0):
     time.sleep(12)  # stay within 5 RPM
 
     token = _get_ebay_token()
-    api_limit = min(max(limit * 4, limit), 50)
+    page_limit = min(max(int(limit), 1), 50)
     resp = requests.get(
         EBAY_SEARCH_URL,
         headers={
@@ -203,7 +203,7 @@ def search_ebay(query, limit=5, offset=0):
         },
         params={
             "q": query,
-            "limit": api_limit,
+            "limit": page_limit,
             "offset": offset,
             "fieldgroups": "MATCHING_ITEMS,EXTENDED",
         },

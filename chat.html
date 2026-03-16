@@ -71,6 +71,28 @@
       text-align: center;
     }
 
+    .hidden {
+      display: none !important;
+    }
+
+    #setup-page,
+    #chat-page {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    #setup-page {
+      overflow-y: auto;
+      padding-bottom: 20px;
+    }
+
+    #chat-page {
+      opacity: 1;
+      transition: opacity 0.25s ease;
+    }
+
     /* ── Filter panel ───────────────────────── */
     #filters {
       width: 100%;
@@ -104,6 +126,9 @@
       border-radius: 6px;
       outline: none;
     }
+    #filters select[multiple] {
+      min-height: 88px;
+    }
     #filters .wide {
       grid-column: 1 / -1;
     }
@@ -125,6 +150,71 @@
       width: 16px;
       height: 16px;
     }
+    #continue-btn {
+      width: 100%;
+      max-width: 800px;
+      margin: 10px auto 0;
+      height: 44px;
+      background: #ff3c3c;
+      border: none;
+      color: #fff;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    #continue-btn:hover { background: #ff5555; box-shadow: 0 0 14px #ff3c3c66; }
+
+    #chat-layout {
+      width: 100%;
+      max-width: 1180px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 280px;
+      gap: 14px;
+      flex: 1 1 auto;
+      min-height: 0;
+      padding: 10px 12px 0;
+    }
+    #chat-column {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    #settings-panel {
+      border: 1px solid #1f1f1f;
+      background: #0d0d0dc9;
+      backdrop-filter: blur(6px);
+      border-radius: 8px;
+      padding: 12px;
+      height: fit-content;
+      max-height: calc(100vh - 140px);
+      overflow-y: auto;
+    }
+    #settings-panel .title {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #ff6a6a;
+      margin-bottom: 10px;
+    }
+    #settings-summary {
+      font-size: 12px;
+      color: #bdbdbd;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+    @media (max-width: 980px) {
+      #chat-layout {
+        grid-template-columns: 1fr;
+      }
+      #settings-panel {
+        max-height: none;
+      }
+    }
 
     /* ── Chat area ──────────────────────────── */
     #chat {
@@ -135,9 +225,14 @@
       display: flex;
       flex-direction: column;
       gap: 16px;
-      max-width: 800px;
+      max-width: 100%;
       width: 100%;
       margin: 0 auto;
+      border: 1px solid #1a1a1a;
+      border-bottom: none;
+      background: #0d0d0db8;
+      border-top-left-radius: 8px;
+      border-top-right-radius: 8px;
     }
 
     .msg {
@@ -146,9 +241,39 @@
       border-radius: 8px;
       line-height: 1.5;
       font-size: 14px;
-      white-space: pre-wrap;
       word-wrap: break-word;
       overflow-wrap: anywhere;
+    }
+    .msg-body p { margin: 0 0 8px; }
+    .msg-body p:last-child { margin-bottom: 0; }
+    .msg-body ul,
+    .msg-body ol { margin: 0 0 8px 20px; }
+    .msg-body li { margin: 2px 0; }
+    .msg-body h1,
+    .msg-body h2,
+    .msg-body h3 { margin: 0 0 8px; line-height: 1.3; }
+    .msg-body h1 { font-size: 18px; }
+    .msg-body h2 { font-size: 16px; }
+    .msg-body h3 { font-size: 15px; }
+    .msg-body code {
+      background: #1b1b1b;
+      border: 1px solid #2d2d2d;
+      border-radius: 4px;
+      padding: 1px 4px;
+      font-size: 12px;
+    }
+    .msg-body pre {
+      background: #101010;
+      border: 1px solid #2a2a2a;
+      border-radius: 6px;
+      padding: 10px;
+      overflow-x: auto;
+      margin: 0 0 8px;
+    }
+    .msg-body pre code {
+      background: transparent;
+      border: none;
+      padding: 0;
     }
     .msg.user {
       align-self: flex-end;
@@ -172,6 +297,33 @@
     }
     .msg.user .label { color: #555; }
     .msg.assistant .label { color: #ff3c3c; }
+
+    .thinking {
+      margin: 0 0 8px 0;
+      border: 1px solid #3a2020;
+      border-radius: 6px;
+      background: #100b0b;
+      overflow: hidden;
+    }
+    .thinking summary {
+      cursor: pointer;
+      padding: 8px 10px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #ff7b7b;
+      user-select: none;
+    }
+    .thinking pre {
+      margin: 0;
+      padding: 8px 10px 10px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: #bfbfbf;
+      white-space: pre-wrap;
+      word-break: break-word;
+      border-top: 1px solid #2a1616;
+    }
 
     .msg.assistant a {
       color: #ff6a6a;
@@ -249,11 +401,14 @@
       gap: 10px;
       padding: 16px 20px;
       border-top: 1px solid #1a1a1a;
-      max-width: 800px;
+      max-width: 100%;
       width: 100%;
       margin: 0 auto;
       background: #0d0d0dcf;
       backdrop-filter: blur(6px);
+      border: 1px solid #1a1a1a;
+      border-bottom-left-radius: 8px;
+      border-bottom-right-radius: 8px;
     }
 
     #prompt {
@@ -741,89 +896,21 @@
     </div>
   </header>
 
-  <div id="filters">
-    <div>
-      <label for="product-type">Looking for</label>
-      <select id="product-type">
-        <option value="">Any</option>
-        <option value="card">Graphics card</option>
-        <option value="desktop">Desktop</option>
-        <option value="laptop">Laptop</option>
-      </select>
-    </div>
-    <div>
-      <label for="brand">Brand</label>
-      <select id="brand">
-        <option value="any">Any</option>
-        <option value="NVIDIA">NVIDIA</option>
-        <option value="AMD">AMD</option>
-        <option value="Intel">Intel</option>
-        <option value="Apple">Apple</option>
-      </select>
-    </div>
-    <div>
-      <label for="model">Model or range</label>
-      <input id="model" type="text" placeholder="RTX 4080 / RX 6800 XT" />
-    </div>
-    <div>
-      <label for="tier">Performance tier</label>
-      <select id="tier">
-        <option value="">Any</option>
-        <option value="budget">Budget</option>
-        <option value="mid">Mid</option>
-        <option value="high">High-end</option>
-        <option value="enthusiast">Enthusiast</option>
-      </select>
-    </div>
-    <div>
-      <label>Price range (USD)</label>
-      <div class="inline">
-        <input id="min-price" type="number" min="0" placeholder="Min" />
-        <input id="max-price" type="number" min="0" placeholder="Max" />
+  <div id="chat-layout">
+    <div id="chat-column">
+      <div id="chat"></div>
+      <div id="img-preview"></div>
+      <div id="input-bar">
+        <button id="img-btn" title="Attach image" aria-label="Attach image">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M21.44 11.05l-8.49 8.49a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 115.66 5.66l-9.2 9.2a2 2 0 01-2.83-2.83l8.49-8.49" />
+          </svg>
+        </button>
+        <input type="file" id="img-input" accept="image/*" multiple hidden />
+        <textarea id="prompt" rows="1" placeholder="Ask HardPulse anything... (paste or attach images)" autofocus></textarea>
+        <button id="send-btn">Send</button>
       </div>
     </div>
-    <div>
-      <label for="delivery-days">Delivery time</label>
-      <select id="delivery-days">
-        <option value="">Any</option>
-        <option value="3"><= 3 days</option>
-        <option value="7"><= 7 days</option>
-        <option value="14"><= 14 days</option>
-      </select>
-    </div>
-    <div>
-      <label for="condition">Condition</label>
-      <select id="condition">
-        <option value="any">Any</option>
-        <option value="new">New</option>
-        <option value="used">Used</option>
-        <option value="parts">For parts</option>
-      </select>
-    </div>
-    <div class="checkbox">
-      <input id="exclude-local" type="checkbox" />
-      <label for="exclude-local">Exclude local pickup</label>
-    </div>
-    <div class="wide">
-      <label for="notes">Other must-haves</label>
-      <input id="notes" type="text" placeholder="Example: include original box, warranty, low hours" />
-    </div>
-  </div>
-
-  <div id="chat"></div>
-
-  <div id="img-preview"></div>
-  <div id="input-bar">
-    <button id="img-btn" title="Attach image" aria-label="Attach image">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <rect x="3" y="6" width="18" height="14" rx="2.5"></rect>
-        <path d="M8 6l1.2-2h5.6L16 6"></path>
-        <circle cx="12" cy="13" r="3.2"></circle>
-      </svg>
-    </button>
-    <input type="file" id="img-input" accept="image/*" multiple hidden />
-    <textarea id="prompt" rows="1" placeholder="Ask HardPulse anything... (paste or attach images)" autofocus></textarea>
-    <button id="send-btn">Send</button>
   </div>
 
   <script>
@@ -833,18 +920,7 @@
     const imgBtn = document.getElementById("img-btn");
     const imgInput = document.getElementById("img-input");
     const imgPreview = document.getElementById("img-preview");
-    const productTypeEl = document.getElementById("product-type");
-    const brandEl = document.getElementById("brand");
-    const modelEl = document.getElementById("model");
-    const tierEl = document.getElementById("tier");
-    const minPriceEl = document.getElementById("min-price");
-    const maxPriceEl = document.getElementById("max-price");
-    const deliveryDaysEl = document.getElementById("delivery-days");
-    const conditionEl = document.getElementById("condition");
-    const excludeLocalEl = document.getElementById("exclude-local");
-    const notesEl = document.getElementById("notes");
 
-    let lastSearchFilters = null;
     let lastSearchQuery = "";
 
     let messages = [];   // conversation history sent to API
@@ -913,34 +989,110 @@
         .replace(/'/g, "&#39;");
     }
 
-    function linkify(text) {
-      const urlRegex = /https?:\/\/[^\s]+/g;
-      let result = "";
-      let lastIndex = 0;
-      let match;
-
-      while ((match = urlRegex.exec(text)) !== null) {
-        const start = match.index;
-        const end = urlRegex.lastIndex;
-        result += escapeHtml(text.slice(lastIndex, start));
-
-        let url = match[0];
-        let trailing = "";
-        while (/[\]\[\)\.,!?:;]$/.test(url)) {
-          trailing = url.slice(-1) + trailing;
-          url = url.slice(0, -1);
-        }
-
-        const safeUrl = escapeHtml(url);
-        result += `<a href="${safeUrl}" target="_blank" rel="noopener">${safeUrl}</a>${escapeHtml(trailing)}`;
-        lastIndex = end;
-      }
-
-      result += escapeHtml(text.slice(lastIndex));
-      return result;
+    function formatInlineMarkdown(text) {
+      let out = escapeHtml(text || "");
+      out = out.replace(/`([^`]+)`/g, "<code>$1</code>");
+      out = out.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+      out = out.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+      out = out.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+      out = out.replace(/_([^_]+)_/g, "<em>$1</em>");
+      out = out.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+      out = out.replace(/(^|\s)(https?:\/\/[^\s<]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+      return out;
     }
 
-    function addMsg(role, text, images, htmlContent) {
+    function renderMarkdown(text) {
+      const lines = (text || "").replace(/\r\n/g, "\n").split("\n");
+      const html = [];
+      let inCode = false;
+      let codeBuffer = [];
+      let inUl = false;
+      let inOl = false;
+
+      function closeLists() {
+        if (inUl) {
+          html.push("</ul>");
+          inUl = false;
+        }
+        if (inOl) {
+          html.push("</ol>");
+          inOl = false;
+        }
+      }
+
+      for (const line of lines) {
+        if (line.trim().startsWith("```")) {
+          if (!inCode) {
+            closeLists();
+            inCode = true;
+            codeBuffer = [];
+          } else {
+            html.push(`<pre><code>${escapeHtml(codeBuffer.join("\n"))}</code></pre>`);
+            inCode = false;
+            codeBuffer = [];
+          }
+          continue;
+        }
+
+        if (inCode) {
+          codeBuffer.push(line);
+          continue;
+        }
+
+        const trimmed = line.trim();
+        if (!trimmed) {
+          closeLists();
+          continue;
+        }
+
+        const headingMatch = trimmed.match(/^(#{1,3})\s+(.*)$/);
+        if (headingMatch) {
+          closeLists();
+          const level = headingMatch[1].length;
+          html.push(`<h${level}>${formatInlineMarkdown(headingMatch[2])}</h${level}>`);
+          continue;
+        }
+
+        const ulMatch = trimmed.match(/^[-*+]\s+(.*)$/);
+        if (ulMatch) {
+          if (inOl) {
+            html.push("</ol>");
+            inOl = false;
+          }
+          if (!inUl) {
+            html.push("<ul>");
+            inUl = true;
+          }
+          html.push(`<li>${formatInlineMarkdown(ulMatch[1])}</li>`);
+          continue;
+        }
+
+        const olMatch = trimmed.match(/^\d+\.\s+(.*)$/);
+        if (olMatch) {
+          if (inUl) {
+            html.push("</ul>");
+            inUl = false;
+          }
+          if (!inOl) {
+            html.push("<ol>");
+            inOl = true;
+          }
+          html.push(`<li>${formatInlineMarkdown(olMatch[1])}</li>`);
+          continue;
+        }
+
+        closeLists();
+        html.push(`<p>${formatInlineMarkdown(trimmed)}</p>`);
+      }
+
+      if (inCode) {
+        html.push(`<pre><code>${escapeHtml(codeBuffer.join("\n"))}</code></pre>`);
+      }
+      closeLists();
+      return html.join("");
+    }
+
+    function addMsg(role, text, images, htmlContent, thinkingData) {
       const div = document.createElement("div");
       div.className = "msg " + role;
       const label = document.createElement("span");
@@ -955,12 +1107,23 @@
           div.appendChild(img);
         });
       }
+      if (role === "assistant" && thinkingData) {
+        const thinking = document.createElement("details");
+        thinking.className = "thinking";
+        const summary = document.createElement("summary");
+        summary.textContent = "Thinking";
+        const pre = document.createElement("pre");
+        pre.textContent = JSON.stringify(thinkingData, null, 2);
+        thinking.appendChild(summary);
+        thinking.appendChild(pre);
+        div.appendChild(thinking);
+      }
       const body = document.createElement("div");
       body.className = "msg-body";
       if (htmlContent) {
         body.innerHTML = htmlContent;
       } else if (text) {
-        body.innerHTML = linkify(text);
+        body.innerHTML = renderMarkdown(text);
       }
       div.appendChild(body);
       chat.appendChild(div);
@@ -968,31 +1131,16 @@
       return div;
     }
 
-    function collectFilters() {
-      return {
-        product_type: productTypeEl.value,
-        brand: brandEl.value,
-        model: modelEl.value.trim(),
-        tier: tierEl.value,
-        min_price: minPriceEl.value,
-        max_price: maxPriceEl.value,
-        delivery_days: deliveryDaysEl.value,
-        condition: conditionEl.value,
-        exclude_local: excludeLocalEl.checked,
-        notes: notesEl.value.trim()
-      };
-    }
-
     async function handleLoadMore(button) {
       const query = button.getAttribute("data-query") || lastSearchQuery;
       const offset = parseInt(button.getAttribute("data-offset") || "0", 10);
       const filtersAttr = button.getAttribute("data-filters");
-      let filters = lastSearchFilters || {};
+      let filters = {};
       if (filtersAttr) {
         try {
           filters = JSON.parse(filtersAttr);
         } catch (e) {
-          filters = lastSearchFilters || {};
+          filters = {};
         }
       }
 
@@ -1011,7 +1159,7 @@
           addMsg("assistant", "Error: " + data.error);
           return;
         }
-        addMsg("assistant", data.reply, null, data.reply_html);
+        addMsg("assistant", data.reply, null, data.reply_html, data.thinking);
       } catch (e) {
         addMsg("assistant", "Network error: " + e.message);
       }
@@ -1045,13 +1193,18 @@
 
       // Build content array for vision API
       const content = [];
+
       images.forEach(dataUrl => {
         content.push({ type: "image_url", image_url: { url: dataUrl } });
       });
-      if (text) content.push({ type: "text", text: text });
+      if (text) content.push({ type: "text", text });
 
-      const filters = collectFilters();
-      messages.push({ role: "user", content: content.length === 1 && !images.length ? text : content });
+      messages.push({ role: "user", content });
+
+      const outboundMessages = [...messages];
+      while (outboundMessages.length && outboundMessages[0].role !== "user") {
+        outboundMessages.shift();
+      }
 
       showTyping();
 
@@ -1059,7 +1212,7 @@
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages, filters }),
+          body: JSON.stringify({ messages: outboundMessages, filters: {} }),
         });
         const data = await res.json();
         hideTyping();
@@ -1070,8 +1223,7 @@
           errDiv.textContent = "Error: " + data.error;
           chat.appendChild(errDiv);
         } else {
-          addMsg("assistant", data.reply, null, data.reply_html);
-          lastSearchFilters = filters;
+          addMsg("assistant", data.reply, null, data.reply_html, data.thinking);
           lastSearchQuery = text;
           const assistantText = data.reply || "eBay results returned.";
           messages.push({ role: "assistant", content: assistantText });
@@ -1099,6 +1251,9 @@
     promptEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
     });
+
+    const initialGreeting = "Hello, computer part seeker! What are you trying to find?";
+    addMsg("assistant", initialGreeting);
 
     // Auto-resize textarea
     promptEl.addEventListener("input", () => {

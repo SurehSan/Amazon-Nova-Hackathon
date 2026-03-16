@@ -5,6 +5,7 @@ import json
 import base64
 import html
 import requests
+from urllib.parse import urlparse
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from openai import OpenAI
@@ -19,12 +20,56 @@ client = OpenAI(
 
 MODEL = "AGENT-0145989dba254b77afd38709902f002c"
 
+GUIDE_SYSTEM_PROMPT = (
+    "You are HardPulse, a hardware-finding assistant. Guide the user step-by-step before searching listings. "
+    "Start by understanding what they want, then ask concise follow-up questions when needed (budget, condition, performance target, desktop/laptop/card, and urgency). "
+    "Never provide direct product/listing links yourself. If the user wants listings, ask them to request an eBay search."
+)
+
 # ── eBay Browse API credentials ─────────────────────────────
 EBAY_APP_ID = os.getenv("EBAY_APP_ID", "SurehSan-Browse-PRD-8bf3c6448-d5a65e34")
 EBAY_CERT_ID = os.getenv("EBAY_CERT_ID", "PRD-bf3c64488749-d9ba-41cd-8bdd-0e0a")
 
 EBAY_TOKEN_URL = "https://api.ebay.com/identity/v1/oauth2/token"
 EBAY_SEARCH_URL = "https://api.ebay.com/buy/browse/v1/item_summary/search"
+
+_NON_HARDWARE_TERMS = [
+    "trading card",
+    "pokemon",
+    "yugioh",
+    "magic the gathering",
+    "mtg",
+    "sports card",
+    "baseball card",
+    "basketball card",
+    "football card",
+    "psa",
+    "graded card",
+    "one piece card",
+]
+
+_HARDWARE_HINT_TERMS = [
+    "rtx",
+    "gtx",
+    "rx ",
+    "ryzen",
+    "core i",
+    "intel",
+    "amd",
+    "gpu",
+    "graphics card",
+    "desktop",
+    "laptop",
+    "motherboard",
+    "ssd",
+    "nvme",
+    "ddr4",
+    "ddr5",
+    "psu",
+    "watt",
+    "pc",
+    "computer",
+]
 
 # Simple in-memory token cache
 _ebay_token_cache = {"access_token": None, "expires_at": 0}
@@ -61,12 +106,94 @@ def _get_ebay_token():
     return _ebay_token_cache["access_token"]
 
 
+def _extract_legacy_item_id(item):
+    legacy_item_id = item.get("legacyItemId")
+    if legacy_item_id:
+        return str(legacy_item_id)
+
+    raw_item_id = str(item.get("itemId") or "")
+    # itemId can be in form: v1|123456789012|0
+    match = re.search(r"\|(\d{9,})\|", raw_item_id)
+    if match:
+        return match.group(1)
+
+    if raw_item_id.isdigit():
+        return raw_item_id
+    return ""
+
+
+def _build_candidate_listing_urls(item):
+    candidates = []
+    for key in ["itemWebUrl", "itemAffiliateWebUrl"]:
+        value = item.get(key)
+        if isinstance(value, str) and value.startswith("http"):
+            candidates.append(value)
+
+    legacy_item_id = _extract_legacy_item_id(item)
+    if legacy_item_id:
+        candidates.append(f"https://www.ebay.com/itm/{legacy_item_id}")
+
+    deduped = []
+    seen = set()
+    for value in candidates:
+        if value not in seen:
+            seen.add(value)
+            deduped.append(value)
+    return deduped
+
+
+def _is_ebay_listing_url(url):
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+    host = (parsed.netloc or "").lower()
+    path = (parsed.path or "").lower()
+    return "ebay." in host and "/itm/" in path
+
+
+def _canonicalize_listing_url(url):
+    if not isinstance(url, str) or not url.startswith("http"):
+        return ""
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return ""
+
+    host = (parsed.netloc or "").lower()
+    if "ebay." not in host:
+        return ""
+
+    path = parsed.path or ""
+    match = re.search(r"/itm/(\d{9,})", path)
+    if match:
+        return f"https://www.ebay.com/itm/{match.group(1)}"
+
+    if "/itm/" in path:
+        return f"https://www.ebay.com{path}"
+
+    return ""
+
+
+def _pick_live_listing_url(item):
+    legacy_item_id = _extract_legacy_item_id(item)
+    if legacy_item_id:
+        return f"https://www.ebay.com/itm/{legacy_item_id}"
+
+    for url in _build_candidate_listing_urls(item):
+        canonical = _canonicalize_listing_url(url)
+        if canonical:
+            return canonical
+    return ""
+
+
 # ── eBay search (rate-limited to 5 RPM) ────────────────────
 def search_ebay(query, limit=5, offset=0):
     """Search eBay using the Browse API and return a list of items."""
     time.sleep(12)  # stay within 5 RPM
 
     token = _get_ebay_token()
+    api_limit = min(max(limit * 4, limit), 50)
     resp = requests.get(
         EBAY_SEARCH_URL,
         headers={
@@ -76,7 +203,7 @@ def search_ebay(query, limit=5, offset=0):
         },
         params={
             "q": query,
-            "limit": limit,
+            "limit": api_limit,
             "offset": offset,
             "fieldgroups": "MATCHING_ITEMS,EXTENDED",
         },
@@ -87,6 +214,10 @@ def search_ebay(query, limit=5, offset=0):
 
     items = []
     for item in data.get("itemSummaries", []):
+        live_url = _pick_live_listing_url(item)
+        if not live_url:
+            continue
+
         price_value = _safe_float(item.get("price", {}).get("value"))
         shipping_option = ((item.get("shippingOptions") or [{}])[0] or {})
         shipping_cost_value = _safe_float((shipping_option.get("shippingCost") or {}).get("value"))
@@ -95,13 +226,15 @@ def search_ebay(query, limit=5, offset=0):
             "price":     price_value,
             "currency":  item.get("price", {}).get("currency"),
             "condition": item.get("condition"),
-            "url":       item.get("itemWebUrl"),
+            "url":       live_url,
             "image":     item.get("image", {}).get("imageUrl"),
             "seller":    item.get("seller", {}).get("username"),
             "shipping_cost": shipping_cost_value,
             "shipping_cost_type": shipping_option.get("shippingCostType"),
             "item_location": (item.get("itemLocation") or {}).get("country"),
         })
+        if len(items) >= limit:
+            break
     return items
 
 
@@ -128,12 +261,33 @@ def _should_search_ebay(text):
     if not text:
         return False
     lowered = text.lower()
-    triggers = ["search", "find", "deal", "deals", "price", "prices", "ebay"]
+    triggers = [
+        "search ebay",
+        "search for",
+        "find deals",
+        "find me",
+        "show listings",
+        "search now",
+        "look it up on ebay",
+        "ebay search",
+        "best price",
+        "buy",
+    ]
     if any(trigger in lowered for trigger in triggers):
         return True
-    if re.search(r"\b(rtx|rx|ryzen|core i[3579]|i[3579]-\d{4,5})\b", lowered):
+    if re.fullmatch(r"\d{4}", lowered.strip()):
+        return True
+    if any(token in lowered for token in ["rtx", "gtx", "rx ", "ryzen", "core i", "gpu", "graphics card"]):
         return True
     return False
+
+
+def _strip_links_from_text(text):
+    cleaned = text or ""
+    cleaned = re.sub(r"\[([^\]]+)\]\((https?://[^)]+)\)", r"\1", cleaned)
+    cleaned = re.sub(r"https?://\S+", "", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+    return cleaned
 
 
 def _safe_float(value):
@@ -150,18 +304,38 @@ def _normalize_filters(filters):
     for key, value in filters.items():
         if value is None:
             continue
+        if isinstance(value, list):
+            normalized_list = []
+            for item in value:
+                if isinstance(item, str):
+                    item = item.strip()
+                if item not in (None, "", []):
+                    normalized_list.append(item)
+            if normalized_list:
+                clean[key] = normalized_list
+            continue
         if isinstance(value, str):
             value = value.strip()
+            if value == "":
+                continue
         clean[key] = value
     return clean
 
 
+def _as_list(value):
+    if isinstance(value, list):
+        return value
+    if value in (None, ""):
+        return []
+    return [value]
+
+
 def _build_search_query(user_text, filters):
     tokens = []
-    product_type = filters.get("product_type") or ""
-    brand = filters.get("brand") or ""
+    product_types = _as_list(filters.get("product_type"))
+    brands = _as_list(filters.get("brand"))
     model = filters.get("model") or ""
-    tier = filters.get("tier") or ""
+    tiers = _as_list(filters.get("tier"))
     notes = filters.get("notes") or ""
 
     type_map = {
@@ -169,10 +343,12 @@ def _build_search_query(user_text, filters):
         "desktop": "desktop pc",
         "laptop": "laptop",
     }
-    if product_type in type_map:
-        tokens.append(type_map[product_type])
-    if brand and brand.lower() != "any":
-        tokens.append(brand)
+    for product_type in product_types:
+        if product_type in type_map:
+            tokens.append(type_map[product_type])
+    for brand in brands:
+        if isinstance(brand, str) and brand.lower() != "any":
+            tokens.append(brand)
     if model:
         tokens.append(model)
 
@@ -182,8 +358,9 @@ def _build_search_query(user_text, filters):
         "high": "high end",
         "enthusiast": "enthusiast",
     }
-    if tier in tier_map:
-        tokens.append(tier_map[tier])
+    for tier in tiers:
+        if tier in tier_map:
+            tokens.append(tier_map[tier])
 
     if notes:
         tokens.append(notes)
@@ -191,20 +368,65 @@ def _build_search_query(user_text, filters):
     combined = " ".join(token for token in tokens if token)
     base = (user_text or "").strip()
     if base and combined:
-        return f"{base} {combined}".strip()
-    if combined:
-        return combined.strip()
-    return base
+        query = f"{base} {combined}".strip()
+    elif combined:
+        query = combined.strip()
+    else:
+        query = base
+
+    return _normalize_ebay_query(query)
+
+
+def _normalize_ebay_query(query):
+    query = (query or "").strip()
+    if not query:
+        return query
+
+    lowered = query.lower()
+    for phrase in [
+        "search ebay",
+        "ebay search",
+        "search now",
+        "show listings",
+        "find deals",
+        "look it up on ebay",
+    ]:
+        lowered = lowered.replace(phrase, " ")
+
+    lowered = re.sub(r"\s+", " ", lowered).strip()
+
+    if re.fullmatch(r"\d{4}", lowered):
+        return f"rtx {lowered} graphics card"
+
+    if re.search(r"\b\d{4}\b", lowered) and not any(term in lowered for term in ["rtx", "gtx", "rx", "ryzen", "intel", "amd"]):
+        lowered = f"{lowered} graphics card pc"
+
+    if not any(term in lowered for term in _HARDWARE_HINT_TERMS):
+        lowered = f"{lowered} computer hardware pc part"
+
+    return lowered.strip()
+
+
+def _is_hardware_listing(title):
+    lowered = (title or "").lower()
+    if any(term in lowered for term in _NON_HARDWARE_TERMS):
+        return False
+    if any(term in lowered for term in _HARDWARE_HINT_TERMS):
+        return True
+    return False
 
 
 def _build_required_tokens(filters):
     tokens = []
-    brand = (filters.get("brand") or "").lower().strip()
+    brands = [str(brand).lower().strip() for brand in _as_list(filters.get("brand"))]
     model = (filters.get("model") or "").lower().strip()
-    if brand and brand != "any":
-        tokens.append(brand)
+    for brand in brands:
+        if brand and brand != "any":
+            tokens.append(brand)
     if model:
-        tokens.append(model)
+        for token in re.split(r"\s*,\s*", model):
+            if token:
+                tokens.append(token)
     return tokens
 
 
@@ -217,7 +439,7 @@ def _title_has_required_tokens(title, tokens):
 
 def _apply_post_filters(items, filters):
     required_tokens = _build_required_tokens(filters)
-    condition = (filters.get("condition") or "").lower().strip()
+    condition_values = [str(c).lower().strip() for c in _as_list(filters.get("condition")) if str(c).strip()]
     exclude_local = bool(filters.get("exclude_local"))
     min_price = _safe_float(filters.get("min_price"))
     max_price = _safe_float(filters.get("max_price"))
@@ -229,15 +451,22 @@ def _apply_post_filters(items, filters):
 
         if not title or not url or "ebay." not in url:
             continue
+        if not _is_hardware_listing(title):
+            continue
         if not _title_has_required_tokens(title, required_tokens):
             continue
-        if condition and condition != "any":
+        active_conditions = [c for c in condition_values if c != "any"]
+        if active_conditions:
             item_condition = (item.get("condition") or "").lower()
-            if condition == "new" and "new" not in item_condition:
-                continue
-            if condition == "used" and "used" not in item_condition:
-                continue
-            if condition == "parts" and "parts" not in item_condition and "not working" not in item_condition:
+            condition_match = False
+            for condition in active_conditions:
+                if condition == "new" and "new" in item_condition:
+                    condition_match = True
+                elif condition == "used" and "used" in item_condition:
+                    condition_match = True
+                elif condition == "parts" and ("parts" in item_condition or "not working" in item_condition):
+                    condition_match = True
+            if not condition_match:
                 continue
         if exclude_local:
             title_lower = title.lower()
@@ -309,20 +538,23 @@ def _format_ebay_results(items, query, offset, limit, filters):
     median_price = _median(prices)
 
     filter_summary = []
-    if filters.get("product_type"):
-        filter_summary.append(f"Type: {filters['product_type']}")
-    if filters.get("brand"):
-        filter_summary.append(f"Brand: {filters['brand']}")
+    product_types = _as_list(filters.get("product_type"))
+    brands = _as_list(filters.get("brand"))
+    tiers = _as_list(filters.get("tier"))
+    conditions = _as_list(filters.get("condition"))
+
+    if product_types:
+        filter_summary.append(f"Type: {', '.join(str(value) for value in product_types)}")
+    if brands:
+        filter_summary.append(f"Brand: {', '.join(str(value) for value in brands)}")
     if filters.get("model"):
         filter_summary.append(f"Model: {filters['model']}")
-    if filters.get("tier"):
-        filter_summary.append(f"Tier: {filters['tier']}")
+    if tiers:
+        filter_summary.append(f"Tier: {', '.join(str(value) for value in tiers)}")
     if filters.get("min_price") or filters.get("max_price"):
         filter_summary.append(f"Price: {filters.get('min_price','?')} - {filters.get('max_price','?')}")
-    if filters.get("delivery_days"):
-        filter_summary.append(f"Delivery: <= {filters['delivery_days']} days")
-    if filters.get("condition"):
-        filter_summary.append(f"Condition: {filters['condition']}")
+    if conditions:
+        filter_summary.append(f"Condition: {', '.join(str(value) for value in conditions)}")
 
     summary_text = " | ".join(filter_summary) if filter_summary else "Filters: none"
 
@@ -383,6 +615,21 @@ def _format_ebay_results(items, query, offset, limit, filters):
     }
 
 
+def _build_ebay_thinking_payload(query, limit, offset, filters):
+    return {
+        "endpoint": EBAY_SEARCH_URL,
+        "method": "GET",
+        "params": {
+            "q": query,
+            "limit": limit,
+            "offset": offset,
+            "fieldgroups": "MATCHING_ITEMS,EXTENDED",
+        },
+        "marketplace": "EBAY_US",
+        "active_filters": filters,
+    }
+
+
 @app.route("/")
 def index():
     return send_from_directory(".", "chat.html")
@@ -402,7 +649,13 @@ def ebay_search():
         results = search_ebay(query, limit=limit, offset=offset)
         filtered = _apply_post_filters(results, filters)
         formatted = _format_ebay_results(filtered, query=query, offset=offset, limit=limit, filters=filters)
-        return jsonify({"results": results, "reply": formatted["text"], "reply_html": formatted["html"]})
+        thinking = _build_ebay_thinking_payload(query=query, limit=limit, offset=offset, filters=filters)
+        return jsonify({
+            "results": results,
+            "reply": formatted["text"],
+            "reply_html": formatted["html"],
+            "thinking": thinking,
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -421,16 +674,18 @@ def chat():
             results = search_ebay(query, limit=5, offset=0)
             filtered = _apply_post_filters(results, filters)
             formatted = _format_ebay_results(filtered, query=query, offset=0, limit=5, filters=filters)
-            return jsonify({"reply": formatted["text"], "reply_html": formatted["html"]})
+            thinking = _build_ebay_thinking_payload(query=query, limit=5, offset=0, filters=filters)
+            return jsonify({"reply": formatted["text"], "reply_html": formatted["html"], "thinking": thinking})
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
     try:
+        model_messages = [{"role": "system", "content": GUIDE_SYSTEM_PROMPT}] + messages
         response = client.chat.completions.create(
             model=MODEL,
-            messages=messages,
+            messages=model_messages,
         )
-        reply = response.choices[0].message.content
+        reply = _strip_links_from_text(response.choices[0].message.content)
         return jsonify({"reply": reply})
     except Exception as e:
         return jsonify({"error": str(e)}), 500

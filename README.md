@@ -1,5 +1,7 @@
 # Inspiration
 We wanted to build an app that would get rid of the trouble of excessively looking through the web for deals on hardware. We knew that people who had beginner knowledge to computer parts would search the web and often be met with lies, scams, and general confusion. This is why CacheHunt was made - to provide an ease of mind when search for computer deals.
+<img width="1112" height="745" alt="image" src="https://github.com/user-attachments/assets/25fdbccd-f54c-43df-8669-bec048a9f1db" />
+
 
 # What it does
 Searches with an eBay API for hardware with filters, then uses Nova for the brain and chats with you about the best options based on what it found.

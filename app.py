@@ -25,7 +25,9 @@ MODEL = "AGENT-0145989dba254b77afd38709902f002c"
 
 GUIDE_SYSTEM_PROMPT = (
     "You are CacheHunt, a hardware-finding assistant. Guide the user step-by-step before searching listings. "
-    "Start by understanding what they want, then ask concise follow-up questions when needed (budget, condition, performance target, desktop/laptop/card, and urgency). "
+    "Start by understanding what they want, then ask concise follow-up questions when needed (budget, condition, performance target, desktop/laptop/card, urgency, "
+    "and minimum seller feedback score). Explain that a seller's feedback score is the total number of positive ratings they have received on eBay — "
+    "common thresholds: 50 = new but okay, 500 = established, 1000+ = highly trusted. "
     "Never provide direct product/listing links yourself and never output marketplace results. "
     "In every response, include one short line: 'When you're ready for live deals, type: Search now.'"
 )
@@ -74,6 +76,70 @@ _HARDWARE_HINT_TERMS = [
     "pc",
     "computer",
 ]
+
+# Hard-reject terms: ALWAYS indicate an accessory, never a standalone GPU
+_GPU_HARD_REJECT_TERMS = [
+    "adapter",
+    "cable",
+    "charger",
+    "connector",
+    "12vhpwr",
+    "power cord",
+    "power supply",
+    "extension cord",
+    "riser",
+    "sli bridge",
+    "nvlink",
+    "dummy plug",
+    "sticker",
+    "decal",
+    "keychain",
+    "poster",
+    "cooler w/",
+    "cooler for",
+    "cooling fan for",
+    "board io",
+    "io board",
+]
+
+# Soft-reject terms: indicate accessory unless a confirm term is also present
+_GPU_SOFT_REJECT_TERMS = [
+    "bracket",
+    "shroud",
+    "backplate only",
+    "heatsink only",
+    "box only",
+    "empty box",
+    "original box",
+]
+
+# Terms that confirm a listing is an actual GPU (overrides soft-reject only)
+_GPU_CONFIRM_TERMS = [
+    "graphics card",
+    "video card",
+    "gddr",
+    "gddr6",
+    "gddr6x",
+    "vram",
+    "founders edition",
+]
+
+# Regex patterns that strongly indicate the listing is an accessory *for* a GPU
+_ACCESSORY_FOR_GPU_RE = re.compile(
+    r"(?:^|\b)(?:for|fits?|compatible with|support(?:s)?)\s+.*?"
+    r"(?:rtx|gtx|rx|geforce|radeon|nvidia|amd)\s*\d{3,4}",
+    re.IGNORECASE,
+)
+
+_NOT_ACTUAL_GPU_RE = re.compile(
+    r"(?:enclosure only|no\s+(?:graphic[s]?\s+card|gpu)"
+    r"|water\s*block|waterblock|water\s*cool"
+    r"|thermal pad|thermal paste|replacement\s+fan|cooler\s+replacement"
+    r"|io\s+shield"
+    r"|ek-quantum|quantum\s+vector|nickel\s*\+?\s*plexi|acetal"
+    r"|pacific\s+v-)",
+    re.IGNORECASE,
+)
 
 # Simple in-memory token cache
 _ebay_token_cache = {"access_token": None, "expires_at": 0}
@@ -197,19 +263,23 @@ def search_ebay(query, limit=5, offset=0, filters=None):
     time.sleep(12)  # stay within 5 RPM
 
     token = _get_ebay_token()
-    page_limit = min(max(int(limit), 1), 50)
+    # Overfetch to compensate for items removed by post-filtering (accessories, etc.)
+    page_limit = 50
 
     # Build eBay filter string for price range and condition
     ebay_filters = []
     if filters:
         min_price = _safe_float(filters.get("min_price"))
         max_price = _safe_float(filters.get("max_price"))
+        # Format prices as clean strings (no trailing .0)
+        def _fmt_price(p):
+            return str(int(p)) if p == int(p) else f"{p:.2f}"
         if min_price is not None and max_price is not None:
-            ebay_filters.append(f"price:[{min_price}..{max_price}],priceCurrency:USD")
+            ebay_filters.append(f"price:[{_fmt_price(min_price)}..{_fmt_price(max_price)}],priceCurrency:USD")
         elif min_price is not None:
-            ebay_filters.append(f"price:[{min_price}],priceCurrency:USD")
+            ebay_filters.append(f"price:[{_fmt_price(min_price)}],priceCurrency:USD")
         elif max_price is not None:
-            ebay_filters.append(f"price:[..{max_price}],priceCurrency:USD")
+            ebay_filters.append(f"price:[..{_fmt_price(max_price)}],priceCurrency:USD")
 
         condition_map = {"new": "NEW", "used": "USED", "refurbished": "REFURBISHED"}
         condition_values = _as_list(filters.get("condition"))
@@ -260,12 +330,12 @@ def search_ebay(query, limit=5, offset=0, filters=None):
             "url":       live_url,
             "image":     item.get("image", {}).get("imageUrl"),
             "seller":    item.get("seller", {}).get("username"),
+            "seller_feedback_score": item.get("seller", {}).get("feedbackScore"),
+            "seller_feedback_percentage": item.get("seller", {}).get("feedbackPercentage"),
             "shipping_cost": shipping_cost_value,
             "shipping_cost_type": shipping_option.get("shippingCostType"),
             "item_location": (item.get("itemLocation") or {}).get("country"),
         })
-        if len(items) >= limit:
-            break
     return items
 
 
@@ -423,6 +493,17 @@ def _infer_filters_from_text(search_context):
     if conditions:
         inferred["condition"] = sorted(set(conditions))
 
+    feedback_patterns = [
+        r"(?:feedback|seller)\s*(?:score|rating)?\s*(?:of|at least|above|over|minimum|min|:)?\s*(\d{1,6})",
+        r"(\d{1,6})\+?\s*(?:seller\s*)?(?:feedback|rating)\s*(?:score)?",
+        r"(?:min(?:imum)?)\s+(?:seller\s*)?(?:feedback|rating)\s*(?:score)?\s*(\d{1,6})",
+    ]
+    for fp in feedback_patterns:
+        feedback_match = re.search(fp, text)
+        if feedback_match:
+            inferred["min_feedback_score"] = int(feedback_match.group(1))
+            break
+
     if "local pickup" in text or "pickup only" in text:
         inferred["exclude_local"] = True
 
@@ -527,6 +608,15 @@ def _strip_non_product_terms(text):
     for pattern in intent_phrases:
         cleaned = re.sub(pattern, " ", cleaned)
 
+    # Strip seller feedback phrases
+    feedback_patterns = [
+        r"\d{1,6}\+?\s*(?:seller\s*)?(?:feedback|rating)\s*(?:score)?",
+        r"(?:feedback|seller)\s*(?:score|rating)?\s*(?:of|at least|above|over|minimum|min|:)?\s*\d{1,6}\+?",
+        r"\bmin(?:imum)?\s+(?:seller\s*)?(?:feedback|rating)\s*(?:score)?\s*\d{1,6}\+?",
+    ]
+    for pattern in feedback_patterns:
+        cleaned = re.sub(pattern, " ", cleaned)
+
     # Strip stray punctuation and collapse whitespace
     cleaned = re.sub(r"[,.:;!?]+", " ", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
@@ -581,12 +671,49 @@ def _title_has_required_tokens(title, tokens):
     return all(token in lowered for token in tokens)
 
 
+def _is_gpu_search(filters):
+    """Return True if the search is for a discrete GPU (RTX, GTX, RX)."""
+    model = (filters.get("model") or "").upper()
+    return bool(re.search(r"\b(RTX|GTX|RX)\s?\d{3,4}", model))
+
+
+def _is_gpu_accessory(title):
+    """Return True if the title looks like a GPU accessory, not an actual GPU."""
+    lowered = (title or "").lower()
+
+    # Always-reject patterns (waterblock, enclosure only, etc.)
+    if _NOT_ACTUAL_GPU_RE.search(lowered):
+        return True
+
+    # "For RTX 4080...", "Fits RTX 4090..." — accessory for a GPU
+    if _ACCESSORY_FOR_GPU_RE.search(lowered):
+        return True
+
+    # Hard-reject terms — always an accessory, no override
+    if any(term in lowered for term in _GPU_HARD_REJECT_TERMS):
+        return True
+
+    # Motherboard listings (laptop mobo with integrated GPU)
+    if "motherboard" in lowered or "mainboard" in lowered:
+        return True
+
+    # Soft-reject terms — can be overridden by confirm terms
+    has_soft_reject = any(term in lowered for term in _GPU_SOFT_REJECT_TERMS)
+    if has_soft_reject:
+        has_confirm_term = any(term in lowered for term in _GPU_CONFIRM_TERMS)
+        return not has_confirm_term
+
+    return False
+
+
 def _apply_post_filters(items, filters):
     required_tokens = _build_required_tokens(filters)
     condition_values = [str(c).lower().strip() for c in _as_list(filters.get("condition")) if str(c).strip()]
     exclude_local = bool(filters.get("exclude_local"))
     min_price = _safe_float(filters.get("min_price"))
     max_price = _safe_float(filters.get("max_price"))
+    min_feedback = filters.get("min_feedback_score")
+    gpu_search = _is_gpu_search(filters)
 
     filtered = []
     for item in items:
@@ -598,6 +725,8 @@ def _apply_post_filters(items, filters):
         if not _is_hardware_listing(title):
             continue
         if not _title_has_required_tokens(title, required_tokens):
+            continue
+        if gpu_search and _is_gpu_accessory(title):
             continue
         active_conditions = [c for c in condition_values if c != "any"]
         if active_conditions:
@@ -622,6 +751,10 @@ def _apply_post_filters(items, filters):
                 continue
         if max_price is not None:
             if item_price is None or item_price > max_price:
+                continue
+        if min_feedback is not None:
+            seller_score = item.get("seller_feedback_score")
+            if seller_score is None or seller_score < min_feedback:
                 continue
         filtered.append(item)
     return filtered
@@ -721,10 +854,19 @@ def _format_ebay_results(items, query, offset, limit, filters):
         url = item.get("url") or ""
         shipping_cost = item.get("shipping_cost")
         shipping_text = "Shipping: N/A" if shipping_cost is None else f"Shipping: ${shipping_cost:,.2f}"
+        seller_name = item.get("seller") or "Unknown"
+        feedback_score = item.get("seller_feedback_score")
+        feedback_pct = item.get("seller_feedback_percentage")
+        seller_text = f"Seller: {seller_name}"
+        if feedback_score is not None:
+            seller_text += f" ({feedback_score:,} feedback"
+            if feedback_pct is not None:
+                seller_text += f", {feedback_pct}% positive"
+            seller_text += ")"
         warnings = _collect_warnings(item)
 
         price_text = f"${price:,.2f} {currency}" if price is not None else "Price N/A"
-        lines.append(f"{idx}. {title}\n   {price_text}\n   {url}")
+        lines.append(f"{idx}. {title}\n   {price_text}\n   {seller_text}\n   {url}")
 
         efficiency_text = "Efficiency: N/A"
         if price is not None and median_price:
@@ -736,6 +878,7 @@ def _format_ebay_results(items, query, offset, limit, filters):
             "<li>"
             f"<div class=\"ebay-title\"><a href=\"{html.escape(url, quote=True)}\" target=\"_blank\" rel=\"noopener\">{html.escape(title)}</a></div>"
             f"<div class=\"ebay-meta\">{html.escape(price_text)} | Condition: {html.escape(condition)} | {html.escape(shipping_text)}</div>"
+            f"<div class=\"ebay-meta\">{html.escape(seller_text)}</div>"
             f"<div class=\"ebay-eff\">{html.escape(efficiency_text)}</div>"
             + (f"<div class=\"ebay-warn\">Flags: {html.escape(', '.join(warnings))}</div>" if warnings else "")
             + "</li>"
@@ -794,7 +937,7 @@ def ebay_search():
 
     try:
         results = search_ebay(query, limit=limit, offset=offset, filters=filters)
-        filtered = _apply_post_filters(results, filters)
+        filtered = _apply_post_filters(results, filters)[:limit]
         formatted = _format_ebay_results(filtered, query=query, offset=offset, limit=limit, filters=filters)
         thinking = _build_ebay_thinking_payload(query=query, limit=limit, offset=offset, filters=filters)
         return jsonify({
@@ -828,11 +971,11 @@ def chat():
         offset = 0
         if _is_more_results_command(user_text):
             previous_batches = _count_previous_ebay_batches(messages)
-            offset = max(previous_batches, 1) * 5
+            offset = max(previous_batches, 1) * 50
 
         try:
             results = search_ebay(query, limit=5, offset=offset, filters=effective_filters)
-            filtered = _apply_post_filters(results, effective_filters)
+            filtered = _apply_post_filters(results, effective_filters)[:5]
             formatted = _format_ebay_results(filtered, query=query, offset=offset, limit=5, filters=effective_filters)
             thinking = _build_ebay_thinking_payload(query=query, limit=5, offset=offset, filters=effective_filters)
             return jsonify({"reply": formatted["text"], "reply_html": formatted["html"], "thinking": thinking})

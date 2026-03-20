@@ -1,12 +1,15 @@
+# Context
+This project was made as submission for the 2026 Amazon Nova Hackathon that took place from Feburary to March. The basic premise of the competition was to use the Amazon Nova AI model to create a useful application. There were multiple categories of what we could build, but we eventually fell under the Multimodal Understanding category.
+For more information on the competition: https://amazon-nova.devpost.com/rules
+
+
 # Inspiration
 We wanted to build an app that would get rid of the trouble of excessively looking through the web for deals on hardware. We knew that people who had beginner knowledge to computer parts would search the web and often be met with lies, scams, and general confusion. This is why CacheHunt was made - to provide an ease of mind when search for computer deals.
 <img width="1112" height="745" alt="image" src="https://github.com/user-attachments/assets/25fdbccd-f54c-43df-8669-bec048a9f1db" />
 
-
 # What it does
 Searches with an eBay API for hardware with filters, then uses Nova for the brain and chats with you about the best options based on what it found.
 <img width="1080" height="967" alt="image" src="https://github.com/user-attachments/assets/5110011a-e442-468a-be1d-ea426c416b74" />
-
 
 # How we built it
 We started by setting up AWS and requesting Nova Pro access through Bedrock, while simultaneously getting our eBay developer credentials and enabling the APIs we needed. From there, we built a Lambda function that chains together eBay's Finding and Browse APIs to pull listing details and real sold-price history, then feeds that data alongside listing images into Nova Pro to generate a deal verdict. We wired it all up through API Gateway so our Manifest V3 Chrome extension could grab the item ID off any eBay listing page and display the full analysis in a clean popup.
